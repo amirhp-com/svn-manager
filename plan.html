@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVN Manager — Plan (Swift / macOS)</title>
+<style>
+  :root{
+    --text:#f1f3f8; --muted:#9aa3b8; --accent:#7cb8ff; --accent2:#7ee2b8;
+    --m:#7cb8ff; --a:#7ee2b8; --d:#ff8a8a; --q:#9aa3b8; --bang:#ffb86b;
+    --stroke:rgba(255,255,255,.16); --glass:rgba(255,255,255,.07);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;color:var(--text);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 10% -10%, #2a3858 0%, transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, #4a2a55 0%, transparent 55%),
+      radial-gradient(800px 600px at 50% 110%, #1d3a48 0%, transparent 60%),
+      #0c0e14;
+    background-attachment:fixed;
+  }
+  .wrap{max-width:1080px;margin:40px auto;padding:0 24px}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font-size:18px;margin:30px 0 10px;color:#cfe1ff}
+  h3{font-size:12px;margin:18px 0 6px;color:var(--accent2);text-transform:uppercase;letter-spacing:.1em}
+  p,li{color:var(--text)} .muted{color:var(--muted)}
+  code,pre{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+  code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:5px;border:1px solid var(--stroke)}
+  pre{background:var(--glass);border:1px solid var(--stroke);border-radius:10px;padding:14px;overflow:auto;backdrop-filter:blur(20px)}
+  .glass{
+    background:var(--glass);
+    border:1px solid var(--stroke);
+    border-radius:14px;
+    padding:18px;
+    backdrop-filter:blur(24px) saturate(160%);
+    -webkit-backdrop-filter:blur(24px) saturate(160%);
+    box-shadow:0 20px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .badge{display:inline-block;background:rgba(124,184,255,.16);color:var(--accent);
+    padding:2px 8px;border-radius:999px;font-size:11px;margin-left:6px;border:1px solid rgba(124,184,255,.35)}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0 16px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--stroke);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+
+  /* mock window */
+  .mock{border-radius:14px;overflow:hidden;margin:18px 0;border:1px solid var(--stroke);
+    box-shadow:0 30px 80px rgba(0,0,0,.55);
+    background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+    backdrop-filter:blur(30px) saturate(180%)}
+  .titlebar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--stroke)}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  .title{margin-left:8px;color:var(--muted);font-size:12px}
+  .tabs{display:flex;gap:8px;padding:14px 18px 6px}
+  .tab{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;
+    background:rgba(255,255,255,.06);border:1px solid var(--stroke);color:#dde4f3;font-size:13px}
+  .tab.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.35);color:#fff}
+  .tab svg{width:13px;height:13px;opacity:.9}
+  .body{padding:14px 18px 18px;display:flex;flex-direction:column;gap:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .input{flex:1;min-width:200px;background:rgba(0,0,0,.25);border:1px solid var(--stroke);
+    border-radius:7px;padding:7px 10px;color:var(--text);font-size:12.5px}
+  .btn{background:rgba(255,255,255,.10);border:1px solid var(--stroke);color:#fff;
+    padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:default}
+  .btn.primary{background:rgba(124,184,255,.85);color:#0a0d14;border-color:transparent;font-weight:600}
+  .btn.danger{background:rgba(255,90,90,.22);color:#ffb3b3;border-color:rgba(255,90,90,.4)}
+  .panel{background:rgba(0,0,0,.22);border:1px solid var(--stroke);border-radius:11px;padding:12px 14px}
+  .panel h4{margin:0 0 8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  .meta{display:flex;flex-wrap:wrap;gap:14px 24px;font-size:12.5px;color:var(--muted)}
+  .meta b{color:#fff;font-weight:500}
+  .status div{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;padding:2px 0}
+  .s-m{color:var(--m)} .s-a{color:var(--a)} .s-d{color:var(--d)} .s-q{color:var(--q)} .s-bang{color:var(--bang)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+  .log{background:rgba(0,0,0,.35);border:1px solid var(--stroke);border-radius:10px;padding:11px 13px;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:11.5px;color:#cfd6e6}
+  .log .cmd{color:var(--accent2)} .log .ok{color:var(--a)}
+  .pill{display:inline-flex;align-items:center;gap:5px;background:rgba(126,226,184,.15);
+    color:var(--accent2);border:1px solid rgba(126,226,184,.35);padding:2px 8px;border-radius:999px;font-size:11px}
+  .pill.off{background:rgba(255,255,255,.05);color:var(--muted);border-color:var(--stroke)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>SVN Manager <span class="badge">Swift · macOS · SwiftUI</span></h1>
+  <p class="muted">Single-window native Mac app — three tabs, dark mode, Apple liquid-glass vibrancy. Wraps your repeated SVN/Git workflow into one-click buttons with saved auth profiles. Every button has a tooltip explaining what it does and shows the exact <code>svn</code> command in a live activity log.</p>
+
+  <h2>Context</h2>
+  <div class="glass">
+    You repeatedly run the same SVN sequences to manage WordPress.org plugins (status, add, commit, tag, fix MIME types on assets, prune missing files) and occasionally pull a Git repo for plugin source. This app collapses all of that into a single SwiftUI window with three tabs: <b>SVN Folder</b>, <b>SVN URL</b>, and <b>SVN Auth</b>. Auth profiles can be scoped to all folders or to a specific folder + subfolders, with one optional default. The Folder tab lets you choose <i>None — use svn internal auth</i> or any matching saved profile.
+  </div>
+
+  <h2>UI Sample — Tab 1: SVN Folder</h2>
+  <div class="mock">
+    <div class="titlebar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">SVN Manager</span>
+    </div>
+    <div class="tabs">
+      <span class="tab active">📁 SVN Folder</span>
+      <span class="tab">🔗 SVN URL</span>
+      <span class="tab">🔑 SVN Auth</span>
+    </div>
+    <div class="body">
+
+      <div class="row">
+        <input class="input" value="~/svn/my-plugin">
+        <span class="btn">Browse…</span>
+        <span class="btn primary">Inspect</span>
+      </div>
+
+      <div class="panel">
+        <div class="row" style="margin-bottom:8px">
+          <span class="pill">● SVN</span>
+          <span class="pill off">○ Git</span>
+        </div>
+        <div class="meta">
+          <span><b>URL</b> https://plugins.svn.wordpress.org/my-plugin</span>
+          <span><b>Rev</b> r1423</span>
+          <span><b>Root</b> ~/svn/my-plugin</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="muted" style="font-size:12px">SVN Auth:</span>
+        <span class="btn">wporg-amirhp (default) ▾</span>
+      </div>
+
+      <div class="panel">
+        <h4>Status</h4>
+        <div class="status">
+          <div class="s-m">M&nbsp;&nbsp;trunk/plugin.php</div>
+          <div class="s-m">M&nbsp;&nbsp;trunk/readme.txt</div>
+          <div class="s-a">A&nbsp;&nbsp;trunk/includes/new-class.php</div>
+          <div class="s-q">?&nbsp;&nbsp;trunk/notes.md</div>
+          <div class="s-bang">!&nbsp;&nbsp;assets/old-banner.png</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>Actions</h4>
+        <div class="grid">
+          <span class="btn" title="Show local changes vs the working copy. Runs: svn stat">↻ Refresh status</span>
+          <span class="btn" title="Download latest changes from the server. Runs: svn update">⤓ Pull latest (svn update)</span>
+          <span class="btn" title="Add untracked files inside trunk/. Runs: svn add trunk/* --force">＋ Stage new files in trunk</span>
+          <span class="btn primary" title="Commit staged changes. Runs: svn ci -m &quot;…&quot;">⇪ Commit changes…</span>
+          <span class="btn primary" title="Copy trunk → tags/&lt;v&gt; and commit. Runs: svn cp trunk tags/&lt;v&gt; → svn ci">🏷 Release new version (tag)…</span>
+          <span class="btn danger" title="Remove a tag on the server. Runs: svn delete ^/tags/&lt;v&gt; -m …">⌫ Remove a release tag…</span>
+          <span class="btn" title="Set svn:mime-type on assets/* and commit. Runs: svn propset svn:mime-type … → svn commit">🖼 Fix asset MIME types</span>
+          <span class="btn" title="Find files you deleted locally (! rows) and delete them on the server. Runs: svn rm --force &lt;each&gt; → svn commit">⊖ Remove deleted files from SVN</span>
+          <span class="btn" title="Open this folder in Finder">📂 Reveal in Finder</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>Activity log</h4>
+        <div class="log">
+          <div><span class="cmd">$ svn stat</span></div>
+          <div>M&nbsp;&nbsp;trunk/plugin.php</div>
+          <div>!&nbsp;&nbsp;assets/old-banner.png</div>
+          <div class="muted"># release new version</div>
+          <div><span class="cmd">$ svn cp trunk tags/1.4.2</span></div>
+          <div class="ok">A         tags/1.4.2</div>
+          <div><span class="cmd">$ svn ci -m "tagging version 1.4.2"</span></div>
+          <div class="ok">Committed revision 1424.</div>
+          <div class="muted"># remove files deleted locally from SVN</div>
+          <div><span class="cmd">$ svn stat</span></div>
+          <div>!&nbsp;&nbsp;assets/old-banner.png</div>
+          <div><span class="cmd">$ svn rm --force assets/old-banner.png</span></div>
+          <div class="ok">D         assets/old-banner.png</div>
+          <div><span class="cmd">$ svn commit -m "Remove extra files"</span></div>
+          <div class="ok">Committed revision 1425.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <h2>UI Sample — Tab 2: SVN URL</h2>
+  <div class="mock">
+    <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">SVN Manager</span></div>
+    <div class="tabs"><span class="tab">📁 SVN Folder</span><span class="tab active">🔗 SVN URL</span><span class="tab">🔑 SVN Auth</span></div>
+    <div class="body">
+      <div class="panel">
+        <h4>Repository URL</h4>
+        <input class="input" style="width:100%" value="https://plugins.svn.wordpress.org/my-plugin">
+        <h4 style="margin-top:12px">Local folder</h4>
+        <div class="row"><input class="input" value="~/svn/my-plugin"><span class="btn">Browse…</span></div>
+        <div class="row" style="margin-top:12px">
+          <span class="btn">Auto-detect</span><span class="btn active" style="background:rgba(255,255,255,.18)">SVN</span><span class="btn">Git</span>
+          <span style="flex:1"></span>
+          <span class="btn">Auth: wporg-amirhp ▾</span>
+        </div>
+      </div>
+      <div class="row"><span class="btn primary">⤓ Checkout / Fetch latest</span></div>
+      <div class="panel"><h4>Output</h4>
+        <div class="log">
+          <div class="cmd">$ [SVN] https://plugins.svn.wordpress.org/my-plugin → ~/svn/my-plugin</div>
+          <div>A    trunk</div><div>A    tags</div><div>A    assets</div>
+          <div class="ok">Checked out revision 1424.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>UI Sample — Tab 3: SVN Auth</h2>
+  <div class="mock">
+    <div class="titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">SVN Manager</span></div>
+    <div class="tabs"><span class="tab">📁 SVN Folder</span><span class="tab">🔗 SVN URL</span><span class="tab active">🔑 SVN Auth</span></div>
+    <div class="body" style="display:grid;grid-template-columns:280px 1fr;gap:14px">
+      <div class="panel">
+        <h4>Profiles</h4>
+        <div style="background:rgba(255,255,255,.10);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+          <div>wporg-amirhp <span style="color:#ffd86b">★</span></div>
+          <div class="muted" style="font-size:11px">amirhp · all folders</div>
+        </div>
+        <div style="padding:8px 10px">
+          <div>client-acme</div>
+          <div class="muted" style="font-size:11px">acme-svn · ~/work/acme</div>
+        </div>
+        <div class="row" style="margin-top:10px"><span class="btn">＋ Add</span><span class="btn danger">🗑 Delete</span></div>
+      </div>
+      <div class="panel">
+        <h4>Edit profile</h4>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div><div class="muted" style="font-size:11px">Display name</div><input class="input" value="wporg-amirhp"></div>
+          <div><div class="muted" style="font-size:11px">Username</div><input class="input" value="amirhp"></div>
+          <div><div class="muted" style="font-size:11px">Password</div><input class="input" value="••••••••"></div>
+          <div><div class="muted" style="font-size:11px">Scope</div>
+            <div class="row"><input class="input" placeholder="(empty = all folders)"><span class="btn">Pick…</span></div>
+          </div>
+          <div class="row" style="margin-top:4px"><span class="pill">☑ Default profile</span></div>
+          <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="btn">Cancel</span><span class="btn primary">Save</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Stack</h2>
+  <div class="glass">
+    <b>Swift 5.9 · SwiftUI · macOS 13+</b>. Window background uses <code>NSVisualEffectView(.hudWindow, .behindWindow)</code> for Apple vibrancy/glass; <code>.preferredColorScheme(.dark)</code> forces dark mode; hidden title bar. Subprocesses for <code>svn</code> and <code>git</code> via <code>Process</code> + <code>/usr/bin/env</code> (honors <code>PATH</code>). Auth profiles persisted as JSON to <code>~/Library/Application Support/SVNManager/auth.json</code>.
+  </div>
+
+  <h2>File Layout</h2>
+<pre>svn-mananger/
+├── Package.swift
+├── README.md
+└── Sources/SVNManager/
+    ├── SVNManagerApp.swift   # @main, dark+vibrancy window, custom tab bar
+    ├── VisualEffect.swift    # NSVisualEffectView wrapper + GlassCard modifier
+    ├── Shell.swift           # svn / git subprocess runner (auth flags injected)
+    ├── AuthStore.swift       # AuthProfile + JSON persistence + scope matching
+    ├── FolderTab.swift       # Tab 1
+    ├── CheckoutTab.swift     # Tab 2
+    └── AuthTab.swift         # Tab 3</pre>
+
+  <h2>Buttons → Commands (Folder tab)</h2>
+  <table>
+    <thead><tr><th>Button</th><th>Runs</th></tr></thead>
+    <tbody>
+      <tr><td>Inspect</td><td><code>svn info</code> + <code>git rev-parse --abbrev-ref HEAD</code> + <code>git remote -v</code></td></tr>
+      <tr><td>Refresh status</td><td><code>svn stat</code></td></tr>
+      <tr><td>Pull latest (svn update)</td><td><code>svn update</code></td></tr>
+      <tr><td>Stage new files in trunk</td><td><code>svn add trunk/* --force</code></td></tr>
+      <tr><td>Commit changes…</td><td><code>svn ci -m "&lt;msg&gt;"</code></td></tr>
+      <tr><td>Release new version (tag)…</td><td><code>svn cp trunk tags/&lt;v&gt;</code> then <code>svn ci -m "tagging version &lt;v&gt;"</code></td></tr>
+      <tr><td>Remove a release tag…</td><td><code>svn delete ^/tags/&lt;v&gt; -m "Remove incorrect tag &lt;v&gt;."</code></td></tr>
+      <tr><td>Fix asset MIME types</td><td><code>svn propset svn:mime-type</code> on <code>assets/*.{png,jpg,jpeg,gif,svg}</code> → <code>svn commit -m "fixed attachments"</code></td></tr>
+      <tr><td>Remove deleted files from SVN</td><td>parses <code>svn stat</code> for <code>!</code> rows → <code>svn rm --force &lt;file&gt;</code> → <code>svn commit -m "Remove extra files"</code></td></tr>
+      <tr><td>Git status / pull</td><td><code>git status</code> · <code>git pull</code> (only when <code>.git</code> present)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Auth Model</h2>
+  <div class="glass">
+    Each <code>AuthProfile</code> = { name, username, password, scopePath?, isDefault }.
+    <ul style="margin:8px 0 0 18px">
+      <li><b>scopePath nil</b> → applies to all folders.</li>
+      <li><b>scopePath set</b> → applies only when the inspected folder equals it or is a subfolder.</li>
+      <li><b>isDefault</b> → auto-selected on the Folder tab when its scope matches; only one profile can be default at a time (saving a new default clears the old one).</li>
+      <li>Folder tab picker always offers <b>None — use svn internal auth</b> as the first option, so the system <code>~/.subversion</code> credentials are used when no profile is chosen.</li>
+    </ul>
+  </div>
+
+  <h2>Build & Run</h2>
+<pre>cd svn-mananger
+swift run</pre>
+  <p class="muted">Requires Xcode 15 / Swift 5.9 / macOS 13+. Needs <code>svn</code> and <code>git</code> on <code>PATH</code>.</p>
+
+  <h2>Verification</h2>
+  <ol>
+    <li><code>swift build</code> → completes clean (already verified).</li>
+    <li><code>swift run</code> → window opens in dark mode with vibrancy background.</li>
+    <li><b>Auth tab</b>: add a profile, mark as default, save → file appears at <code>~/Library/Application Support/SVNManager/auth.json</code>.</li>
+    <li><b>URL tab</b>: paste a real plugin URL + folder, click Checkout → log streams output, folder populates.</li>
+    <li><b>Folder tab</b>: Browse to that folder, Inspect → SVN pill lights, <code>svn info</code> shown, default auth pre-selected.</li>
+    <li>Touch a file → Refresh status shows <span class="s-m">M</span>; Commit… → revision in log.</li>
+    <li>Tag version <code>9.9.9-test</code> → verify on server; Delete remote tag → confirm gone.</li>
+    <li>Drop a <code>.png</code> in <code>assets/</code>, run Fix attachments → <code>svn proplist -v</code> shows <code>svn:mime-type=image/png</code>.</li>
+    <li>Manually remove a tracked file, click Prune missing → status clears.</li>
+  </ol>
+
+  <h2>Out of Scope (v1)</h2>
+  <ul>
+    <li>Keychain-backed password storage (current: plain JSON; <code>AuthStore</code> API surface is ready for a swap).</li>
+    <li>Diff viewer / conflict resolution UI.</li>
+    <li>Multi-window or per-repo "saved" Folder shortcuts (use Tab 2 to checkout, then browse on Tab 1).</li>
+  </ul>
+
+  <p class="muted" style="margin-top:32px">Plan file: <code>~/.claude/plans/immutable-giggling-sunrise.md</code> · Source: <code>svn-mananger/Sources/SVNManager/</code></p>
+</div>
+</body>
+</html>
