@@ -1,6 +1,24 @@
 import SwiftUI
 import AppKit
 
+/// Reaches up to the host NSWindow so we can apply transparent-titlebar
+/// configuration that SwiftUI doesn't expose directly.
+struct WindowAccessor: NSViewRepresentable {
+    var configure: (NSWindow) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async {
+            if let w = v.window { configure(w) }
+        }
+        return v
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let w = nsView.window { configure(w) }
+        }
+    }
+}
+
 struct VisualEffectBlur: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .hudWindow
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow

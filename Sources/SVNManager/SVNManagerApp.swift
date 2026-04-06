@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.1.0"
-    static let build       = "2"
+    static let version     = "1.2.0"
+    static let build       = "3"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
@@ -16,15 +16,23 @@ struct SVNManagerApp: App {
     var body: some Scene {
         WindowGroup(AppInfo.name) {
             ContentView()
-                .frame(minWidth: 900, minHeight: 780)
+                .frame(minWidth: 860, minHeight: 640)
                 .background(VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow))
+                .background(WindowAccessor { window in
+                    // Transparent vibrant title bar — tabs scroll under it.
+                    window.titlebarAppearsTransparent = true
+                    window.isOpaque = false
+                    window.backgroundColor = .clear
+                    window.styleMask.insert(.fullSizeContentView)
+                    window.titleVisibility = .visible
+                    window.isMovableByWindowBackground = true
+                })
                 .preferredColorScheme(.dark)
                 .environmentObject(authStore)
         }
-        // Visible title-bar so the app name appears next to the traffic lights.
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
-        .defaultSize(width: 980, height: 820)
+        .defaultSize(width: 900, height: 700)
     }
 }
 
@@ -43,7 +51,7 @@ struct ContentView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .padding(.top, 14)
+            .padding(.top, 36)   // leaves room under the transparent title bar / traffic lights
             .padding(.bottom, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
 

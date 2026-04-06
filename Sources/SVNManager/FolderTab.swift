@@ -85,9 +85,9 @@ struct FolderTab: View {
                               systemImage: "tag.slash",
                               danger: true,
                               tooltip: "Delete a tag directly on the server.\nRuns: svn delete ^/tags/<v> -m \"Remove incorrect tag <v>.\"") { deleteTagPrompt() }
-                    actionBtn("Upload assets…",
+                    actionBtn("Commit assets",
                               systemImage: "square.and.arrow.up",
-                              tooltip: "Pick image files to copy into assets/, then svn add and commit them.\nRuns: cp <files> assets/ → svn add assets/* --force → svn commit -m \"update assets\"") { uploadAssets() }
+                              tooltip: "Stage every file inside assets/ (including ones you already copied there yourself in Finder) and commit them.\nRuns: svn add assets/* --force → svn commit -m \"update assets\"") { commitAssets() }
                     actionBtn("Fix asset MIME types",
                               systemImage: "photo",
                               tooltip: "Set svn:mime-type on every image inside assets/ then commit.\nRuns: svn propset svn:mime-type … → svn commit -m \"fixed attachments\"") { fixAttachments() }
@@ -125,7 +125,7 @@ struct FolderTab: View {
                         .textSelection(.enabled)
                         .padding(.vertical, 4)
                 }
-                .frame(minHeight: 100, maxHeight: 180)
+                .frame(minHeight: 90, maxHeight: 130)
             }
             .glassCard()
         }
@@ -299,38 +299,20 @@ struct FolderTab: View {
         svn(["delete", "^/tags/\(v)", "-m", "Remove incorrect tag \(v)."])
     }
 
-    /// Pick image files via NSOpenPanel, copy them into assets/, svn add, commit.
-    private func uploadAssets() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.png, .jpeg, .gif, .svg, .image]
-        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        let sources = panel.urls
+    /// Stage everything inside assets/ (whatever is on disk right now) and commit.
+    /// No file picker — copy files into assets/ yourself in Finder first, then click.
+    private func commitAssets() {
         let assetsDir = "\(folder)/assets"
-
+        guard Shell.isDirectory(assetsDir) else {
+            DispatchQueue.main.async {
+                appendCmd("# commit assets")
+                appendOut("No assets/ directory found.")
+            }
+            return
+        }
         busy = true
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd("# upload assets") }
-            do {
-                if !Shell.isDirectory(assetsDir) {
-                    try FileManager.default.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
-                    DispatchQueue.main.sync { appendOut("created assets/") }
-                }
-                for src in sources {
-                    let dest = URL(fileURLWithPath: "\(assetsDir)/\(src.lastPathComponent)")
-                    if FileManager.default.fileExists(atPath: dest.path) {
-                        try FileManager.default.removeItem(at: dest)
-                    }
-                    try FileManager.default.copyItem(at: src, to: dest)
-                    DispatchQueue.main.sync { appendOut("copied \(src.lastPathComponent)") }
-                }
-            } catch {
-                DispatchQueue.main.sync { appendOut("error: \(error.localizedDescription)") }
-                DispatchQueue.main.async { busy = false }
-                return
-            }
+            DispatchQueue.main.sync { appendCmd("# commit assets") }
             _ = runSvnSync(["add", "assets/*", "--force"])
             _ = runSvnSync(["commit", "-m", "update assets"])
             DispatchQueue.main.async { busy = false }
