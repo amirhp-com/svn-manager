@@ -4,7 +4,7 @@ enum AppInfo {
     static let name        = "SVN Manager"
     static let version     = "1.3.0"
     static let build       = "9"
-    static let author      = "amirhp"
+    static let author      = "AmirhpCom"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
