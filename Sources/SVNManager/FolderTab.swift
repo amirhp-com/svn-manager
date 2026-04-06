@@ -15,12 +15,15 @@ struct FolderTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
 
-            // Folder picker
+            // Folder picker (glass inputs, no focus rings)
             HStack(spacing: 8) {
-                TextField("Folder path", text: $folder)
-                    .textFieldStyle(.roundedBorder)
-                Button("Browse…") { pickFolder() }
-                Button("Inspect") { inspect() }.disabled(folder.isEmpty)
+                GlassTextField(text: $folder, placeholder: "Folder path")
+                    .frame(height: 18)
+                    .glassField()
+                actionPill("Browse…", systemImage: "folder.badge.plus") { pickFolder() }
+                actionPill("Inspect", systemImage: "magnifyingglass") { inspect() }
+                    .opacity(folder.isEmpty ? 0.5 : 1)
+                    .disabled(folder.isEmpty)
             }
 
             // Info
@@ -36,12 +39,13 @@ struct FolderTab: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.85))
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
             }
             .glassCard()
 
-            // Auth selector
-            HStack {
-                Text("SVN Auth:")
+            // Auth selector — glass-styled picker
+            HStack(spacing: 10) {
+                Text("SVN Auth:").foregroundStyle(.secondary)
                 Picker("", selection: $selectedAuthID) {
                     Text("None — use svn internal auth").tag(UUID?.none)
                     ForEach(authStore.candidates(for: folder)) { p in
@@ -49,14 +53,19 @@ struct FolderTab: View {
                     }
                 }
                 .labelsHidden()
+                .pickerStyle(.menu)
+                .buttonStyle(.plain)
+                .focusEffectDisabled()
+                .glassField()
                 .frame(maxWidth: 360)
                 Spacer()
             }
 
-            // Action buttons
+            // Action buttons — uniform fixed-size grid for predictable layout
             VStack(alignment: .leading, spacing: 10) {
                 Text("Actions").font(.caption).foregroundStyle(.secondary)
-                FlowButtons {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 210, maximum: 260), spacing: 10)],
+                          alignment: .leading, spacing: 10) {
                     actionBtn("Refresh status",
                               systemImage: "arrow.clockwise",
                               tooltip: "Show local changes vs the working copy.\nRuns: svn stat") { svnStat() }
@@ -75,13 +84,16 @@ struct FolderTab: View {
                     actionBtn("Remove a release tag…",
                               systemImage: "tag.slash",
                               danger: true,
-                              tooltip: "Delete a tag directly on the server (e.g. an incorrect release).\nRuns: svn delete ^/tags/<v> -m \"Remove incorrect tag <v>.\"") { deleteTagPrompt() }
+                              tooltip: "Delete a tag directly on the server.\nRuns: svn delete ^/tags/<v> -m \"Remove incorrect tag <v>.\"") { deleteTagPrompt() }
+                    actionBtn("Upload assets…",
+                              systemImage: "square.and.arrow.up",
+                              tooltip: "Pick image files to copy into assets/, then svn add and commit them.\nRuns: cp <files> assets/ → svn add assets/* --force → svn commit -m \"update assets\"") { uploadAssets() }
                     actionBtn("Fix asset MIME types",
                               systemImage: "photo",
-                              tooltip: "Set svn:mime-type on every image inside assets/ so WordPress.org serves them correctly, then commit.\nRuns: svn propset svn:mime-type image/png|jpeg|gif|svg+xml <files> → svn commit -m \"fixed attachments\"") { fixAttachments() }
+                              tooltip: "Set svn:mime-type on every image inside assets/ then commit.\nRuns: svn propset svn:mime-type … → svn commit -m \"fixed attachments\"") { fixAttachments() }
                     actionBtn("Remove deleted files from SVN",
                               systemImage: "minus.circle",
-                              tooltip: "Find files you deleted locally (shown as ‘!’ in svn stat) and tell SVN to delete them on the server too, then commit.\nRuns: svn rm --force <each missing file>  →  svn commit -m \"Remove extra files\"") { pruneMissing() }
+                              tooltip: "Find files you deleted locally (! rows) and tell SVN to delete them on the server too, then commit.\nRuns: svn rm --force <each> → svn commit -m \"Remove extra files\"") { pruneMissing() }
                     actionBtn("Reveal in Finder",
                               systemImage: "folder",
                               tooltip: "Open this folder in macOS Finder.") { revealInFinder() }
@@ -102,45 +114,75 @@ struct FolderTab: View {
                 HStack {
                     Text("Activity log").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button("Clear") { log = "" }.buttonStyle(.borderless)
+                    Button("Clear") { log = "" }
+                        .buttonStyle(.borderless)
+                        .focusEffectDisabled()
                 }
                 ScrollView {
                     Text(log.isEmpty ? "—" : log)
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
+                        .padding(.vertical, 4)
                 }
-                .frame(minHeight: 120)
+                .frame(minHeight: 100, maxHeight: 180)
             }
             .glassCard()
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Buttons
 
+    /// Uniform action button used in the grid.
     private func actionBtn(_ title: String,
                            systemImage: String,
                            danger: Bool = false,
                            tooltip: String,
                            action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .padding(.vertical, 7).padding(.horizontal, 11)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(danger ? Color.red.opacity(0.25) : Color.white.opacity(0.10))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                )
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 18)
+                Text(title)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(danger ? Color.red.opacity(0.22) : Color.white.opacity(0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(danger ? Color.red.opacity(0.35) : Color.white.opacity(0.16), lineWidth: 1)
+            )
+            .foregroundStyle(.white)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .help(tooltip)
         .disabled(folder.isEmpty || busy)
+    }
+
+    /// Compact pill button used next to the folder field.
+    private func actionPill(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12.5, weight: .medium))
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.10)))
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.16), lineWidth: 1))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
     }
 
     private var resolvedAuth: AuthProfile? {
@@ -149,6 +191,8 @@ struct FolderTab: View {
         }
         return nil
     }
+
+    // MARK: - Folder ops
 
     private func pickFolder() {
         let panel = NSOpenPanel()
@@ -168,7 +212,6 @@ struct FolderTab: View {
         isSvn = Shell.isDirectory("\(folder)/.svn")
         isGit = Shell.isDirectory("\(folder)/.git")
 
-        // Pick a default auth if scope matches
         if selectedAuthID == nil {
             if let match = authStore.candidates(for: folder).first(where: { $0.isDefault }) {
                 selectedAuthID = match.id
@@ -190,16 +233,20 @@ struct FolderTab: View {
         info = lines.joined(separator: "\n")
     }
 
+    // MARK: - Logging helpers
+
     private func appendCmd(_ cmd: String) {
         log += "$ \(cmd)\n"
     }
+
+    /// Always emits something — never silently swallow empty output. This fixes
+    /// the case where `svn stat` returns no rows on a clean working copy and the
+    /// log appeared to do nothing.
     private func appendOut(_ output: String) {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { log += trimmed + "\n" }
+        log += (trimmed.isEmpty ? "(no output)" : trimmed) + "\n"
     }
 
-    /// Runs svn synchronously on a background queue, logging the command before
-    /// it runs and the output after. Safe to chain inside compound actions.
     private func runSvnSync(_ args: [String]) -> String {
         let cmd = "svn " + args.joined(separator: " ")
         DispatchQueue.main.sync { appendCmd(cmd) }
@@ -250,6 +297,44 @@ struct FolderTab: View {
     private func deleteTagPrompt() {
         guard let v = prompt(title: "Delete remote tag", message: "Tag to remove:"), !v.isEmpty else { return }
         svn(["delete", "^/tags/\(v)", "-m", "Remove incorrect tag \(v)."])
+    }
+
+    /// Pick image files via NSOpenPanel, copy them into assets/, svn add, commit.
+    private func uploadAssets() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .svg, .image]
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        let sources = panel.urls
+        let assetsDir = "\(folder)/assets"
+
+        busy = true
+        DispatchQueue.global().async {
+            DispatchQueue.main.sync { appendCmd("# upload assets") }
+            do {
+                if !Shell.isDirectory(assetsDir) {
+                    try FileManager.default.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
+                    DispatchQueue.main.sync { appendOut("created assets/") }
+                }
+                for src in sources {
+                    let dest = URL(fileURLWithPath: "\(assetsDir)/\(src.lastPathComponent)")
+                    if FileManager.default.fileExists(atPath: dest.path) {
+                        try FileManager.default.removeItem(at: dest)
+                    }
+                    try FileManager.default.copyItem(at: src, to: dest)
+                    DispatchQueue.main.sync { appendOut("copied \(src.lastPathComponent)") }
+                }
+            } catch {
+                DispatchQueue.main.sync { appendOut("error: \(error.localizedDescription)") }
+                DispatchQueue.main.async { busy = false }
+                return
+            }
+            _ = runSvnSync(["add", "assets/*", "--force"])
+            _ = runSvnSync(["commit", "-m", "update assets"])
+            DispatchQueue.main.async { busy = false }
+        }
     }
 
     private func fixAttachments() {
@@ -311,16 +396,5 @@ struct FolderTab: View {
         alert.accessoryView = tf
         let r = alert.runModal()
         return r == .alertFirstButtonReturn ? tf.stringValue : nil
-    }
-}
-
-/// Wraps buttons in a flowing horizontal layout that wraps lines.
-struct FlowButtons<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        // Simple wrap using LazyVGrid with adaptive columns.
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 8)], alignment: .leading, spacing: 8) {
-            content
-        }
     }
 }

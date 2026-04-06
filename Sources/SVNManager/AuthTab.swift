@@ -58,26 +58,39 @@ struct AuthTab: View {
                 if editing {
                     Group {
                         labeled("Display name") {
-                            TextField("e.g. wporg-amirhp", text: $draft.name).textFieldStyle(.roundedBorder)
+                            GlassTextField(text: $draft.name, placeholder: "e.g. wporg-amirhp")
+                                .frame(height: 18).glassField()
                         }
                         labeled("Username") {
-                            TextField("svn username", text: $draft.username).textFieldStyle(.roundedBorder)
+                            GlassTextField(text: $draft.username, placeholder: "svn username")
+                                .frame(height: 18).glassField()
                         }
                         labeled("Password") {
-                            SecureField("svn password", text: $draft.password).textFieldStyle(.roundedBorder)
+                            GlassTextField(text: $draft.password, placeholder: "svn password", isSecure: true)
+                                .frame(height: 18).glassField()
                         }
                         labeled("Scope") {
-                            HStack {
-                                TextField("(empty = all folders)", text: Binding(
+                            HStack(spacing: 8) {
+                                GlassTextField(text: Binding(
                                     get: { draft.scopePath ?? "" },
                                     set: { draft.scopePath = $0.isEmpty ? nil : $0 }
-                                )).textFieldStyle(.roundedBorder)
-                                Button("Pick…") { pickScopeFolder() }
+                                ), placeholder: "(empty = all folders)")
+                                    .frame(height: 18).glassField()
+                                Button { pickScopeFolder() } label: {
+                                    Label("Pick…", systemImage: "folder")
+                                        .font(.system(size: 12.5, weight: .medium))
+                                        .padding(.horizontal, 12).frame(height: 32)
+                                        .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.10)))
+                                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.16), lineWidth: 1))
+                                        .foregroundStyle(.white)
+                                }
+                                .buttonStyle(.plain).focusEffectDisabled()
                             }
                         }
                         Toggle("Default profile", isOn: $draft.isDefault)
                             .toggleStyle(.switch)
                             .padding(.top, 4)
+                            .focusEffectDisabled()
                     }
 
                     HStack {

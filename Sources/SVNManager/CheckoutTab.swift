@@ -18,21 +18,36 @@ struct CheckoutTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Repository URL").font(.caption).foregroundStyle(.secondary)
-                TextField("https://… or svn://…", text: $url).textFieldStyle(.roundedBorder)
+                GlassTextField(text: $url, placeholder: "https://… or svn://…")
+                    .frame(height: 18)
+                    .glassField()
 
                 Text("Local folder").font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    TextField("/path/to/checkout", text: $folder).textFieldStyle(.roundedBorder)
-                    Button("Browse…") { pickFolder() }
+                HStack(spacing: 8) {
+                    GlassTextField(text: $folder, placeholder: "/path/to/checkout")
+                        .frame(height: 18)
+                        .glassField()
+                    Button { pickFolder() } label: {
+                        Label("Browse…", systemImage: "folder.badge.plus")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.10)))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.16), lineWidth: 1))
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .focusEffectDisabled()
                 }
 
-                HStack {
+                HStack(spacing: 10) {
                     Picker("Type", selection: $kind) {
                         ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    .focusEffectDisabled()
                     .frame(maxWidth: 280)
 
                     Picker("Auth", selection: $selectedAuthID) {
@@ -41,6 +56,11 @@ struct CheckoutTab: View {
                             Text("\(p.name)\(p.isDefault ? " (default)" : "")").tag(Optional(p.id))
                         }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .buttonStyle(.plain)
+                    .focusEffectDisabled()
+                    .glassField()
                     .frame(maxWidth: 260)
                     Spacer()
                 }
@@ -52,10 +72,15 @@ struct CheckoutTab: View {
                     fetchLatest()
                 } label: {
                     Label(busy ? "Working…" : "Checkout / Fetch latest", systemImage: "arrow.down.circle.fill")
-                        .padding(.vertical, 8).padding(.horizontal, 14)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(Color.accentColor.opacity(0.85)))
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.horizontal, 16)
+                        .frame(height: 36)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.85)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.18), lineWidth: 1))
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
+                .focusEffectDisabled()
                 .disabled(url.isEmpty || folder.isEmpty || busy)
 
                 Spacer()

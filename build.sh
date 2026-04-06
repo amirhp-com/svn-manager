@@ -8,8 +8,8 @@ cd "$ROOT"
 APP_NAME="SVN Manager"
 EXEC_NAME="SVNManager"
 BUNDLE_ID="com.amirhp.svnmanager"
-VERSION="1.0.0"
-BUILD_NUMBER="1"
+VERSION="1.1.0"
+BUILD_NUMBER="2"
 
 BUILD_DIR="build"
 APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
@@ -56,7 +56,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key>  <string>13.0</string>
   <key>NSHighResolutionCapable</key> <true/>
   <key>NSPrincipalClass</key>        <string>NSApplication</string>
-  <key>NSHumanReadableCopyright</key><string>© $(date +%Y) amirhp.com</string>
+  <key>NSHumanReadableCopyright</key><string>© 2026- amirhp.com</string>
 </dict>
 </plist>
 PLIST

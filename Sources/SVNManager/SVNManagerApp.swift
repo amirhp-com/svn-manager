@@ -2,16 +2,11 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.0.0"
-    static let build       = "1"
-    static let copyright   = "© \(currentYear()) amirhp.com"
+    static let version     = "1.1.0"
+    static let build       = "2"
+    static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
-
-    private static func currentYear() -> String {
-        let f = DateFormatter(); f.dateFormat = "yyyy"
-        return f.string(from: Date())
-    }
 }
 
 @main
@@ -21,12 +16,15 @@ struct SVNManagerApp: App {
     var body: some Scene {
         WindowGroup(AppInfo.name) {
             ContentView()
-                .frame(minWidth: 820, minHeight: 600)
+                .frame(minWidth: 900, minHeight: 780)
                 .background(VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow))
                 .preferredColorScheme(.dark)
                 .environmentObject(authStore)
         }
-        .windowStyle(.hiddenTitleBar)
+        // Visible title-bar so the app name appears next to the traffic lights.
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified(showsTitle: true))
+        .defaultSize(width: 980, height: 820)
     }
 }
 
@@ -36,24 +34,21 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
 
-            // Pinned tab bar — fixed leading alignment so its position never
-            // shifts when the active tab changes or content resizes.
+            // Pinned tab bar — fixed leading alignment, no focus ring, uniform borders.
             HStack(spacing: 8) {
-                TabButton(title: "SVN Folder", systemImage: "folder",   index: 0, selection: $selection)
-                TabButton(title: "SVN URL",    systemImage: "link",     index: 1, selection: $selection)
-                TabButton(title: "SVN Auth",   systemImage: "key.fill", index: 2, selection: $selection)
+                TabButton(title: "SVN Folder", systemImage: "folder",      index: 0, selection: $selection)
+                TabButton(title: "SVN URL",    systemImage: "link",        index: 1, selection: $selection)
+                TabButton(title: "SVN Auth",   systemImage: "key.fill",    index: 2, selection: $selection)
                 TabButton(title: "About",      systemImage: "info.circle", index: 3, selection: $selection)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .padding(.top, 22)
-            .padding(.bottom, 12)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider().opacity(0.25)
 
-            // Each tab gets its own ScrollView so long content scrolls instead
-            // of resizing the window.
             ScrollView(.vertical, showsIndicators: true) {
                 Group {
                     switch selection {
@@ -81,7 +76,6 @@ struct TabButton: View {
     var body: some View {
         let active = selection == index
         Button {
-            // No animation: prevents any layout reflow on the tab bar.
             selection = index
         } label: {
             HStack(spacing: 6) {
@@ -95,12 +89,14 @@ struct TabButton: View {
                     .fill(active ? Color.white.opacity(0.18) : Color.white.opacity(0.06))
             )
             .overlay(
+                // Uniform subtle border on every tab — no extra ring on the active one.
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color.white.opacity(active ? 0.35 : 0.12), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
             .foregroundStyle(.white)
             .fixedSize()
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
     }
 }

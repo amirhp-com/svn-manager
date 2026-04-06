@@ -4,8 +4,6 @@ A lightweight, native macOS app for the WordPress.org plugin SVN workflow. Singl
 
 ![SVN Manager screenshot](docs/screenshot.png)
 
-> Drop your screenshot at `docs/screenshot.png` and it will appear here.
-
 ## Features
 
 - **SVN Folder tab** — pick a working copy, see SVN/Git status, and run common actions with one click:
@@ -33,11 +31,11 @@ open "build/SVN Manager.app"
 1. Render an app icon into `build/AppIcon.icns`
 2. Build a release binary
 3. Assemble `build/SVN Manager.app` with a proper `Info.plist`
-4. Package `build/SVN-Manager-1.0.0.dmg` containing the app and an `Applications` symlink for drag-install
+4. Package `build/SVN-Manager-1.1.0.dmg` containing the app and an `Applications` symlink for drag-install
 
 ## Install
 
-Open `build/SVN-Manager-1.0.0.dmg` and drag **SVN Manager** into **Applications**.
+Open `build/SVN-Manager-1.1.0.dmg` and drag **SVN Manager** into **Applications**.
 
 ## Auth storage
 
@@ -54,4 +52,4 @@ This application is provided "as is", without warranty of any kind, express or i
 
 ## License
 
-© 2026 amirhp.com — All rights reserved.
+© 2026- amirhp.com — All rights reserved.
