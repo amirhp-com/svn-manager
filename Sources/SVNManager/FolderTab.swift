@@ -9,6 +9,7 @@ struct FolderTab: View {
     @State private var info: String = "Select a folder to inspect."
     @State private var isSvn = false
     @State private var isGit = false
+    @State private var wpPluginSlug: String? = nil   // set when svn URL is plugins.svn.wordpress.org/<slug>/
     @State private var selectedAuthID: UUID? = nil   // nil = use svn internal
     @State private var busy = false
 
@@ -20,19 +21,41 @@ struct FolderTab: View {
                 GlassTextField(text: $folder, placeholder: "Folder path")
                     .frame(height: 18)
                     .glassField()
-                actionPill("Browse…", systemImage: "folder.badge.plus") { pickFolder() }
-                actionPill("Inspect", systemImage: "magnifyingglass") { inspect() }
+                actionPill("Browse…",
+                           systemImage: "folder.badge.plus",
+                           tooltip: "Pick a folder on disk. The app will open the standard macOS chooser and then auto-detect whether it is an SVN working copy and/or a Git repository.") { pickFolder() }
+                actionPill("Detect repo",
+                           systemImage: "magnifyingglass",
+                           tooltip: "Re-scan the folder above for SVN/Git metadata and refresh the info panel.\nUseful when you typed or pasted a path manually instead of using Browse…, or when something on disk changed and you want the SVN/Git badges and svn info reread.") { inspect() }
                     .opacity(folder.isEmpty ? 0.5 : 1)
                     .disabled(folder.isEmpty)
             }
 
             // Info
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 14) {
                     Label(isSvn ? "SVN" : "no SVN", systemImage: isSvn ? "checkmark.seal.fill" : "xmark.seal")
                         .foregroundStyle(isSvn ? .green : .secondary)
                     Label(isGit ? "Git" : "no Git", systemImage: isGit ? "checkmark.seal.fill" : "xmark.seal")
                         .foregroundStyle(isGit ? .green : .secondary)
+                    if let slug = wpPluginSlug {
+                        Spacer()
+                        Button {
+                            if let url = URL(string: "https://wordpress.org/plugins/\(slug)/") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            Label("View on WordPress.org", systemImage: "globe")
+                                .font(.system(size: 12, weight: .medium))
+                                .padding(.horizontal, 10).frame(height: 28)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.30)))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.20), lineWidth: 1))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .focusEffectDisabled()
+                        .help("Open https://wordpress.org/plugins/\(slug)/ in your browser.")
+                    }
                 }
                 .font(.callout)
                 Text(info)
@@ -174,7 +197,10 @@ struct FolderTab: View {
     }
 
     /// Compact pill button used next to the folder field.
-    private func actionPill(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func actionPill(_ title: String,
+                            systemImage: String,
+                            tooltip: String,
+                            action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 12.5, weight: .medium))
@@ -186,6 +212,7 @@ struct FolderTab: View {
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()
+        .help(tooltip)
     }
 
     private var resolvedAuth: AuthProfile? {
@@ -210,10 +237,11 @@ struct FolderTab: View {
 
     private func inspect() {
         guard Shell.isDirectory(folder) else {
-            info = "Not a directory."; isSvn = false; isGit = false; return
+            info = "Not a directory."; isSvn = false; isGit = false; wpPluginSlug = nil; return
         }
         isSvn = Shell.isDirectory("\(folder)/.svn")
         isGit = Shell.isDirectory("\(folder)/.git")
+        wpPluginSlug = nil
 
         if selectedAuthID == nil {
             if let match = authStore.candidates(for: folder).first(where: { $0.isDefault }) {
@@ -225,6 +253,7 @@ struct FolderTab: View {
         if isSvn {
             let (_, out) = Shell.svn(["info"], cwd: folder, auth: resolvedAuth)
             lines.append(out.trimmingCharacters(in: .whitespacesAndNewlines))
+            wpPluginSlug = parseWordPressPluginSlug(from: out)
         }
         if isGit {
             let (_, branch) = Shell.git(["rev-parse", "--abbrev-ref", "HEAD"], cwd: folder)
@@ -234,6 +263,22 @@ struct FolderTab: View {
         }
         if !isSvn && !isGit { lines.append("No SVN or Git repository detected.") }
         info = lines.joined(separator: "\n")
+    }
+
+    /// Looks for a `URL: https://plugins.svn.wordpress.org/<slug>/...` line in
+    /// `svn info` output and returns the slug if found.
+    private func parseWordPressPluginSlug(from svnInfo: String) -> String? {
+        for line in svnInfo.split(separator: "\n") {
+            let l = line.trimmingCharacters(in: .whitespaces)
+            guard l.lowercased().hasPrefix("url:") else { continue }
+            let urlPart = l.dropFirst(4).trimmingCharacters(in: .whitespaces)
+            guard let url = URL(string: urlPart),
+                  let host = url.host?.lowercased(),
+                  host == "plugins.svn.wordpress.org" else { return nil }
+            let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+            return parts.first
+        }
+        return nil
     }
 
     // MARK: - Logging helpers
