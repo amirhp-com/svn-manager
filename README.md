@@ -31,11 +31,11 @@ open "build/SVN Manager.app"
 1. Render an app icon into `build/AppIcon.icns`
 2. Build a release binary
 3. Assemble `build/SVN Manager.app` with a proper `Info.plist`
-4. Package `build/SVN-Manager-1.2.0.dmg` containing the app and an `Applications` symlink for drag-install
+4. Package `build/SVN-Manager-1.2.1.dmg` containing the app and an `Applications` symlink for drag-install
 
 ## Install
 
-Open `build/SVN-Manager-1.2.0.dmg` and drag **SVN Manager** into **Applications**.
+Open `build/SVN-Manager-1.2.1.dmg` and drag **SVN Manager** into **Applications**.
 
 ## Auth storage
 

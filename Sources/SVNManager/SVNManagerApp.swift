@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.2.0"
-    static let build       = "3"
+    static let version     = "1.2.1"
+    static let build       = "4"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
@@ -17,21 +17,28 @@ struct SVNManagerApp: App {
         WindowGroup(AppInfo.name) {
             ContentView()
                 .frame(minWidth: 860, minHeight: 640)
-                .background(VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow))
+                // Vibrancy extends edge-to-edge — under the traffic lights too.
+                .background(
+                    VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
+                        .ignoresSafeArea()
+                )
                 .background(WindowAccessor { window in
-                    // Transparent vibrant title bar — tabs scroll under it.
                     window.titlebarAppearsTransparent = true
+                    window.titlebarSeparatorStyle = .none
                     window.isOpaque = false
                     window.backgroundColor = .clear
                     window.styleMask.insert(.fullSizeContentView)
                     window.titleVisibility = .visible
                     window.isMovableByWindowBackground = true
+                    if let tb = window.standardWindowButton(.closeButton)?.superview?.superview {
+                        tb.wantsLayer = true
+                        tb.layer?.backgroundColor = .clear
+                    }
                 })
                 .preferredColorScheme(.dark)
                 .environmentObject(authStore)
         }
         .windowStyle(.titleBar)
-        .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 900, height: 700)
     }
 }

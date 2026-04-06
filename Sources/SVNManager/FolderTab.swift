@@ -104,6 +104,9 @@ struct FolderTab: View {
                         actionBtn("Git pull",
                                   systemImage: "arrow.down",
                                   tooltip: "Pull the latest commits from the Git remote.\nRuns: git pull") { git(["pull"]) }
+                        actionBtn("Git commit & push…",
+                                  systemImage: "arrow.up.circle",
+                                  tooltip: "Stage all changes, commit them with a message, then push to the remote.\nRuns: git add -A → git commit -m \"<your message>\" → git push") { gitCommitPushPrompt() }
                     }
                 }
             }
@@ -359,6 +362,21 @@ struct FolderTab: View {
             }
             if !missing.isEmpty {
                 _ = runSvnSync(["commit", "-m", "Remove extra files"])
+            }
+            DispatchQueue.main.async { busy = false }
+        }
+    }
+
+    private func gitCommitPushPrompt() {
+        guard let msg = prompt(title: "Git commit & push", message: "Commit message:"),
+              !msg.isEmpty else { return }
+        busy = true
+        DispatchQueue.global().async {
+            DispatchQueue.main.sync { appendCmd("# git commit & push") }
+            for args in [["add", "-A"], ["commit", "-m", msg], ["push"]] {
+                DispatchQueue.main.sync { appendCmd("git " + args.joined(separator: " ")) }
+                let (_, out) = Shell.git(args, cwd: folder)
+                DispatchQueue.main.sync { appendOut(out) }
             }
             DispatchQueue.main.async { busy = false }
         }
