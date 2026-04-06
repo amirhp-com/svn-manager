@@ -3,10 +3,10 @@ import AppKit
 
 struct FolderTab: View {
     @EnvironmentObject var authStore: AuthStore
+    @EnvironmentObject var logStore: LogStore
 
     @State private var folder: String = ""
     @State private var info: String = "Select a folder to inspect."
-    @State private var log: String = ""
     @State private var isSvn = false
     @State private var isGit = false
     @State private var selectedAuthID: UUID? = nil   // nil = use svn internal
@@ -117,12 +117,12 @@ struct FolderTab: View {
                 HStack {
                     Text("Activity log").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button("Clear") { log = "" }
+                    Button("Clear") { logStore.clear() }
                         .buttonStyle(.borderless)
                         .focusEffectDisabled()
                 }
                 ScrollView {
-                    Text(log.isEmpty ? "—" : log)
+                    Text(logStore.text.isEmpty ? "—" : logStore.text)
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
@@ -238,24 +238,22 @@ struct FolderTab: View {
 
     // MARK: - Logging helpers
 
-    private func appendCmd(_ cmd: String) {
-        log += "$ \(cmd)\n"
+    @discardableResult
+    private func runSvnSync(_ args: [String]) -> (Int32, String) {
+        logStore.cmd("svn " + args.joined(separator: " "))
+        let (code, out) = Shell.svn(args, cwd: folder, auth: resolvedAuth)
+        logStore.out(out)
+        if code != 0 { logStore.note("(svn exited with \(code))") }
+        return (code, out)
     }
 
-    /// Always emits something — never silently swallow empty output. This fixes
-    /// the case where `svn stat` returns no rows on a clean working copy and the
-    /// log appeared to do nothing.
-    private func appendOut(_ output: String) {
-        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        log += (trimmed.isEmpty ? "(no output)" : trimmed) + "\n"
-    }
-
-    private func runSvnSync(_ args: [String]) -> String {
-        let cmd = "svn " + args.joined(separator: " ")
-        DispatchQueue.main.sync { appendCmd(cmd) }
-        let (_, out) = Shell.svn(args, cwd: folder, auth: resolvedAuth)
-        DispatchQueue.main.sync { appendOut(out) }
-        return out
+    @discardableResult
+    private func runGitSync(_ args: [String]) -> (Int32, String) {
+        logStore.cmd("git " + args.joined(separator: " "))
+        let (code, out) = Shell.git(args, cwd: folder)
+        logStore.out(out)
+        if code != 0 { logStore.note("(git exited with \(code))") }
+        return (code, out)
     }
 
     private func svn(_ args: [String]) {
@@ -268,14 +266,9 @@ struct FolderTab: View {
 
     private func git(_ args: [String]) {
         busy = true
-        let cmd = "git " + args.joined(separator: " ")
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd(cmd) }
-            let (_, out) = Shell.git(args, cwd: folder)
-            DispatchQueue.main.async {
-                appendOut(out)
-                busy = false
-            }
+            _ = runGitSync(args)
+            DispatchQueue.main.async { busy = false }
         }
     }
 
@@ -291,8 +284,8 @@ struct FolderTab: View {
         guard let v = prompt(title: "Tag version", message: "Version (e.g. 1.4.2):"), !v.isEmpty else { return }
         busy = true
         DispatchQueue.global().async {
-            _ = runSvnSync(["cp", "trunk", "tags/\(v)"])
-            _ = runSvnSync(["ci", "-m", "tagging version \(v)"])
+            runSvnSync(["cp", "trunk", "tags/\(v)"])
+            runSvnSync(["ci", "-m", "tagging version \(v)"])
             DispatchQueue.main.async { busy = false }
         }
     }
@@ -307,17 +300,13 @@ struct FolderTab: View {
     private func commitAssets() {
         let assetsDir = "\(folder)/assets"
         guard Shell.isDirectory(assetsDir) else {
-            DispatchQueue.main.async {
-                appendCmd("# commit assets")
-                appendOut("No assets/ directory found.")
-            }
-            return
+            logStore.note("# commit assets"); logStore.note("No assets/ directory found."); return
         }
         busy = true
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd("# commit assets") }
-            _ = runSvnSync(["add", "assets/*", "--force"])
-            _ = runSvnSync(["commit", "-m", "update assets"])
+            logStore.note("# commit assets")
+            runSvnSync(["add", "assets/*", "--force"])
+            runSvnSync(["commit", "-m", "update assets"])
             DispatchQueue.main.async { busy = false }
         }
     }
@@ -325,23 +314,19 @@ struct FolderTab: View {
     private func fixAttachments() {
         let assets = "\(folder)/assets"
         guard Shell.isDirectory(assets) else {
-            DispatchQueue.main.async {
-                appendCmd("# fix asset MIME types")
-                appendOut("No assets/ directory found.")
-            }
-            return
+            logStore.note("# fix asset MIME types"); logStore.note("No assets/ directory found."); return
         }
         busy = true
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd("# fix asset MIME types in assets/") }
+            logStore.note("# fix asset MIME types in assets/")
             for (ext, mime) in [("png","image/png"),("jpg","image/jpeg"),("jpeg","image/jpeg"),("gif","image/gif"),("svg","image/svg+xml")] {
                 let files = (try? FileManager.default.contentsOfDirectory(atPath: assets)
                     .filter { $0.lowercased().hasSuffix("." + ext) }) ?? []
                 if files.isEmpty { continue }
                 let args = ["propset", "svn:mime-type", mime] + files.map { "assets/\($0)" }
-                _ = runSvnSync(args)
+                runSvnSync(args)
             }
-            _ = runSvnSync(["commit", "-m", "fixed attachments"])
+            runSvnSync(["commit", "-m", "fixed attachments"])
             DispatchQueue.main.async { busy = false }
         }
     }
@@ -349,20 +334,16 @@ struct FolderTab: View {
     private func pruneMissing() {
         busy = true
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd("# remove files deleted locally from SVN") }
-            let stat = runSvnSync(["stat"])
+            logStore.note("# remove files deleted locally from SVN")
+            let (_, stat) = runSvnSync(["stat"])
             let missing = stat.split(separator: "\n").compactMap { line -> String? in
                 let s = String(line)
                 guard s.hasPrefix("!") else { return nil }
                 return s.dropFirst().trimmingCharacters(in: .whitespaces)
             }
-            DispatchQueue.main.sync { appendOut("missing files: \(missing.count)") }
-            for f in missing {
-                _ = runSvnSync(["rm", "--force", f])
-            }
-            if !missing.isEmpty {
-                _ = runSvnSync(["commit", "-m", "Remove extra files"])
-            }
+            logStore.note("missing files: \(missing.count)")
+            for f in missing { runSvnSync(["rm", "--force", f]) }
+            if !missing.isEmpty { runSvnSync(["commit", "-m", "Remove extra files"]) }
             DispatchQueue.main.async { busy = false }
         }
     }
@@ -372,12 +353,13 @@ struct FolderTab: View {
               !msg.isEmpty else { return }
         busy = true
         DispatchQueue.global().async {
-            DispatchQueue.main.sync { appendCmd("# git commit & push") }
-            for args in [["add", "-A"], ["commit", "-m", msg], ["push"]] {
-                DispatchQueue.main.sync { appendCmd("git " + args.joined(separator: " ")) }
-                let (_, out) = Shell.git(args, cwd: folder)
-                DispatchQueue.main.sync { appendOut(out) }
+            logStore.note("# git commit & push")
+            runGitSync(["add", "-A"])
+            let (commitCode, _) = runGitSync(["commit", "-m", msg])
+            if commitCode != 0 {
+                logStore.note("(commit step did not produce a new commit — pushing anyway)")
             }
+            runGitSync(["push"])
             DispatchQueue.main.async { busy = false }
         }
     }

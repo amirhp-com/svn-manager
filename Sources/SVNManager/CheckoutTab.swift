@@ -3,12 +3,12 @@ import AppKit
 
 struct CheckoutTab: View {
     @EnvironmentObject var authStore: AuthStore
+    @EnvironmentObject var logStore: LogStore
 
     @State private var url: String = ""
     @State private var folder: String = ""
     @State private var kind: Kind = .auto
     @State private var selectedAuthID: UUID? = nil
-    @State private var log: String = ""
     @State private var busy = false
 
     enum Kind: String, CaseIterable, Identifiable {
@@ -87,14 +87,21 @@ struct CheckoutTab: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Output").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Activity log").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear") { logStore.clear() }
+                        .buttonStyle(.borderless)
+                        .focusEffectDisabled()
+                }
                 ScrollView {
-                    Text(log.isEmpty ? "—" : log)
+                    Text(logStore.text.isEmpty ? "—" : logStore.text)
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
+                        .padding(.vertical, 4)
                 }
-                .frame(minHeight: 200)
+                .frame(minHeight: 120, maxHeight: 200)
             }
             .glassCard()
         }
@@ -127,28 +134,34 @@ struct CheckoutTab: View {
         let isExisting = Shell.isDirectory(folder) &&
             (Shell.isDirectory("\(folder)/.svn") || Shell.isDirectory("\(folder)/.git"))
         DispatchQueue.global().async {
-            let result: (Int32, String)
+            logStore.note("# \(k.rawValue): \(url) → \(folder)")
+            let (code, out): (Int32, String)
             switch k {
             case .svn:
                 if isExisting && Shell.isDirectory("\(folder)/.svn") {
-                    result = Shell.svn(["update"], cwd: folder, auth: resolvedAuth)
+                    logStore.cmd("svn update")
+                    (code, out) = Shell.svn(["update"], cwd: folder, auth: resolvedAuth)
                 } else {
                     try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
-                    result = Shell.svn(["checkout", url, folder], auth: resolvedAuth)
+                    logStore.cmd("svn checkout \(url) \(folder)")
+                    (code, out) = Shell.svn(["checkout", url, folder], auth: resolvedAuth)
                 }
             case .git:
                 if isExisting && Shell.isDirectory("\(folder)/.git") {
-                    result = Shell.git(["pull"], cwd: folder)
+                    logStore.cmd("git pull")
+                    (code, out) = Shell.git(["pull"], cwd: folder)
                 } else {
                     try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
-                    result = Shell.git(["clone", url, folder])
+                    logStore.cmd("git clone \(url) \(folder)")
+                    (code, out) = Shell.git(["clone", url, folder])
                 }
-            case .auto: return
+            case .auto:
+                DispatchQueue.main.async { busy = false }
+                return
             }
-            DispatchQueue.main.async {
-                log += "$ [\(k.rawValue)] \(url) → \(folder)\n\(result.1)\n"
-                busy = false
-            }
+            logStore.out(out)
+            if code != 0 { logStore.note("(exited with \(code))") }
+            DispatchQueue.main.async { busy = false }
         }
     }
 }

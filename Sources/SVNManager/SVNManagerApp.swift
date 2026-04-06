@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.2.1"
-    static let build       = "4"
+    static let version     = "1.2.3"
+    static let build       = "6"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
@@ -12,12 +12,14 @@ enum AppInfo {
 @main
 struct SVNManagerApp: App {
     @StateObject private var authStore = AuthStore.shared
+    @StateObject private var logStore  = LogStore()
 
     var body: some Scene {
         WindowGroup(AppInfo.name) {
             ContentView()
                 .frame(minWidth: 860, minHeight: 640)
-                // Vibrancy extends edge-to-edge — under the traffic lights too.
+                // Vibrancy extends behind the title bar — and stays "active" so it
+                // doesn't dim to solid dark when an NSOpenPanel sheet steals focus.
                 .background(
                     VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
                         .ignoresSafeArea()
@@ -25,18 +27,13 @@ struct SVNManagerApp: App {
                 .background(WindowAccessor { window in
                     window.titlebarAppearsTransparent = true
                     window.titlebarSeparatorStyle = .none
-                    window.isOpaque = false
-                    window.backgroundColor = .clear
                     window.styleMask.insert(.fullSizeContentView)
                     window.titleVisibility = .visible
                     window.isMovableByWindowBackground = true
-                    if let tb = window.standardWindowButton(.closeButton)?.superview?.superview {
-                        tb.wantsLayer = true
-                        tb.layer?.backgroundColor = .clear
-                    }
                 })
                 .preferredColorScheme(.dark)
                 .environmentObject(authStore)
+                .environmentObject(logStore)
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 900, height: 700)
@@ -58,8 +55,8 @@ struct ContentView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .padding(.top, 36)   // leaves room under the transparent title bar / traffic lights
-            .padding(.bottom, 10)
+            .padding(.top, 30)   // just enough to clear the traffic lights
+            .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider().opacity(0.25)

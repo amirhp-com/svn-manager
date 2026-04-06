@@ -2,13 +2,24 @@ import Foundation
 
 enum Shell {
     /// Run a command, return (exitCode, stdout+stderr combined).
+    /// PATH used when launched from a .app bundle, where Finder strips the
+    /// shell PATH and Homebrew binaries (svn, git) wouldn't otherwise be found.
+    private static let extendedPath =
+        "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+
     @discardableResult
     static func run(_ launchPath: String, _ args: [String], cwd: String? = nil) -> (Int32, String) {
         let p = Process()
-        // Use /usr/bin/env so we honor PATH for `svn`, `git`.
         p.launchPath = "/usr/bin/env"
         p.arguments = [launchPath] + args
         if let cwd { p.currentDirectoryURL = URL(fileURLWithPath: cwd) }
+
+        var env = ProcessInfo.processInfo.environment
+        let inherited = env["PATH"] ?? ""
+        env["PATH"] = inherited.isEmpty ? extendedPath : "\(extendedPath):\(inherited)"
+        if env["HOME"] == nil { env["HOME"] = NSHomeDirectory() }
+        p.environment = env
+
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = pipe
