@@ -10,45 +10,46 @@ struct AuthTab: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
 
-            // List
-            VStack(alignment: .leading, spacing: 8) {
+            // Profile list — custom rows, no system List, no blue selection.
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Profiles").font(.caption).foregroundStyle(.secondary)
-                List(selection: $selectedID) {
-                    ForEach(authStore.profiles) { p in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(p.name).font(.body)
-                                Text(p.username).font(.caption).foregroundStyle(.secondary)
-                                Text(p.scopePath ?? "all folders").font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if p.isDefault {
-                                Image(systemName: "star.fill").foregroundStyle(.yellow)
+
+                if authStore.profiles.isEmpty {
+                    Text("No profiles yet. Click Add to create one.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                } else {
+                    VStack(spacing: 6) {
+                        ForEach(authStore.profiles) { p in
+                            ProfileRow(profile: p,
+                                       isSelected: selectedID == p.id) {
+                                selectedID = p.id
+                                editing = false
                             }
                         }
-                        .tag(Optional(p.id))
                     }
                 }
-                .scrollContentBackground(.hidden)
-                .frame(minWidth: 220)
-                HStack {
-                    Button {
+
+                HStack(spacing: 8) {
+                    pillButton("Add", systemImage: "plus") {
                         draft = AuthProfile(name: "New profile", username: "", password: "", scopePath: nil, isDefault: false)
                         editing = true
                         selectedID = nil
-                    } label: { Label("Add", systemImage: "plus") }
-                    Button(role: .destructive) {
+                    }
+                    pillButton("Delete", systemImage: "trash", danger: true) {
                         if let id = selectedID {
                             authStore.profiles.removeAll(where: { $0.id == id })
                             selectedID = nil
                             editing = false
                         }
-                    } label: { Label("Delete", systemImage: "trash") }
+                    }
                     .disabled(selectedID == nil)
+                    .opacity(selectedID == nil ? 0.5 : 1)
                 }
             }
             .glassCard()
-            .frame(maxWidth: 280)
+            .frame(width: 280)
 
             // Editor
             VStack(alignment: .leading, spacing: 10) {
@@ -156,5 +157,66 @@ struct AuthTab: View {
         p.canChooseDirectories = true
         p.canChooseFiles = false
         if p.runModal() == .OK, let u = p.url { draft.scopePath = u.path }
+    }
+
+    private func pillButton(_ title: String, systemImage: String, danger: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12.5, weight: .medium))
+                .padding(.horizontal, 12).frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 8).fill(danger ? Color.red.opacity(0.20) : Color.white.opacity(0.10)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(danger ? Color.red.opacity(0.35) : Color.white.opacity(0.16), lineWidth: 1))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+    }
+}
+
+private struct ProfileRow: View {
+    let profile: AuthProfile
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 12))
+                    .frame(width: 18)
+                    .foregroundStyle(.white.opacity(0.7))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(profile.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                        if profile.isDefault {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.yellow)
+                        }
+                    }
+                    Text("\(profile.username) · \(profile.scopePath ?? "all folders")")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.white.opacity(0.16) : Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.white.opacity(0.30) : Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .foregroundStyle(.white)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
     }
 }

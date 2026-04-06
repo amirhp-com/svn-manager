@@ -2,8 +2,9 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.2.5"
-    static let build       = "8"
+    static let version     = "1.3.0"
+    static let build       = "9"
+    static let author      = "amirhp"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
     static let repoURL     = URL(string: "https://github.com/amirhp-com/svn-manager")!
@@ -13,6 +14,7 @@ enum AppInfo {
 struct SVNManagerApp: App {
     @StateObject private var authStore = AuthStore.shared
     @StateObject private var logStore  = LogStore()
+    @StateObject private var appState  = AppState()
 
     var body: some Scene {
         WindowGroup(AppInfo.name) {
@@ -35,6 +37,7 @@ struct SVNManagerApp: App {
                 .preferredColorScheme(.dark)
                 .environmentObject(authStore)
                 .environmentObject(logStore)
+                .environmentObject(appState)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 900, height: 700)
@@ -42,31 +45,28 @@ struct SVNManagerApp: App {
 }
 
 struct ContentView: View {
-    @State private var selection = 0
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         HStack(spacing: 0) {
 
-            // Vertical sidebar of tabs. Traffic lights float over its top-left,
-            // so the first tab sits below them.
             VStack(alignment: .leading, spacing: 6) {
-                // Spacer that clears the traffic lights area.
-                Color.clear.frame(height: 28)
+                Color.clear.frame(height: 28)   // clears traffic lights
 
-                SideTabButton(title: "SVN Folder", systemImage: "folder",      index: 0, selection: $selection)
-                SideTabButton(title: "SVN URL",    systemImage: "link",        index: 1, selection: $selection)
-                SideTabButton(title: "SVN Auth",   systemImage: "key.fill",    index: 2, selection: $selection)
-                SideTabButton(title: "About",      systemImage: "info.circle", index: 3, selection: $selection)
+                SideTabButton(title: "SVN Folder", systemImage: "folder",              index: 0, selection: $appState.selection)
+                SideTabButton(title: "SVN URL",    systemImage: "link",                index: 1, selection: $appState.selection)
+                SideTabButton(title: "SVN Auth",   systemImage: "key.fill",            index: 2, selection: $appState.selection)
+                SideTabButton(title: "Recents",    systemImage: "clock.arrow.circlepath", index: 3, selection: $appState.selection)
+                SideTabButton(title: "About",      systemImage: "info.circle",         index: 4, selection: $appState.selection)
 
                 Spacer(minLength: 0)
 
-                Text(AppInfo.name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .padding(.bottom, 12).padding(.leading, 4)
+                SidebarFooter()
+                    .padding(.bottom, 12)
+                    .padding(.horizontal, 4)
             }
             .padding(.horizontal, 10)
-            .frame(width: 168)
+            .frame(width: 178)
             .frame(maxHeight: .infinity)
             .background(Color.white.opacity(0.04))
             .overlay(
@@ -78,10 +78,11 @@ struct ContentView: View {
 
             ScrollView(.vertical, showsIndicators: true) {
                 Group {
-                    switch selection {
+                    switch appState.selection {
                     case 0: FolderTab()
                     case 1: CheckoutTab()
                     case 2: AuthTab()
+                    case 3: RecentsTab()
                     default: AboutTab()
                     }
                 }
@@ -91,6 +92,35 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .foregroundStyle(.white)
+    }
+}
+
+struct SidebarFooter: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(AppInfo.name)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+            Text("v\(AppInfo.version) (build \(AppInfo.build))")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.white.opacity(0.50))
+            Button {
+                NSWorkspace.shared.open(AppInfo.repoURL)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left.forwardslash.chevron.right")
+                        .font(.system(size: 9))
+                    Text("by \(AppInfo.author)")
+                        .font(.system(size: 10.5, weight: .medium))
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 8))
+                }
+                .foregroundStyle(Color.accentColor.opacity(0.95))
+            }
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .help("Open the project on GitHub: \(AppInfo.repoURL.absoluteString)")
+        }
     }
 }
 

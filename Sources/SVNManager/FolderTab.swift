@@ -4,6 +4,7 @@ import AppKit
 struct FolderTab: View {
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var logStore: LogStore
+    @EnvironmentObject var appState: AppState
 
     @State private var folder: String = ""
     @State private var info: String = "Select a folder to inspect."
@@ -135,7 +136,23 @@ struct FolderTab: View {
             }
             .glassCard()
 
-            // Log
+            // Log section follows.
+            EmptyView()
+                .onAppear {
+                    if let p = appState.pendingOpen {
+                        folder = p
+                        appState.pendingOpen = nil
+                        inspect()
+                    }
+                }
+                .onChange(of: appState.pendingOpen) { _, newValue in
+                    if let p = newValue {
+                        folder = p
+                        appState.pendingOpen = nil
+                        inspect()
+                    }
+                }
+
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Activity log").font(.caption).foregroundStyle(.secondary)
@@ -242,6 +259,7 @@ struct FolderTab: View {
         isSvn = Shell.isDirectory("\(folder)/.svn")
         isGit = Shell.isDirectory("\(folder)/.git")
         wpPluginSlug = nil
+        appState.record(folder)
 
         if selectedAuthID == nil {
             if let match = authStore.candidates(for: folder).first(where: { $0.isDefault }) {
