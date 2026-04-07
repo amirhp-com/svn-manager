@@ -136,23 +136,6 @@ struct FolderTab: View {
             }
             .glassCard()
 
-            // Log section follows.
-            EmptyView()
-                .onAppear {
-                    if let p = appState.pendingOpen {
-                        folder = p
-                        appState.pendingOpen = nil
-                        inspect()
-                    }
-                }
-                .onChange(of: appState.pendingOpen) { _, newValue in
-                    if let p = newValue {
-                        folder = p
-                        appState.pendingOpen = nil
-                        inspect()
-                    }
-                }
-
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Activity log").font(.caption).foregroundStyle(.secondary)
@@ -171,6 +154,20 @@ struct FolderTab: View {
                 .frame(minHeight: 90, maxHeight: 130)
             }
             .glassCard()
+        }
+        .onAppear {
+            if let p = appState.pendingOpen {
+                folder = p
+                appState.pendingOpen = nil
+                inspect()
+            }
+        }
+        .onChange(of: appState.pendingOpen) { _, newValue in
+            if let p = newValue {
+                folder = p
+                appState.pendingOpen = nil
+                inspect()
+            }
         }
     }
 

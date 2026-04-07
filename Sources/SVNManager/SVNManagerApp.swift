@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.3.1"
-    static let build       = "10"
+    static let version     = "1.3.2"
+    static let build       = "11"
     static let author      = "AmirhpCom"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
@@ -21,8 +21,13 @@ struct SVNManagerApp: App {
             ContentView()
                 .frame(minWidth: 860, minHeight: 640)
                 .background(
-                    VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
-                        .ignoresSafeArea()
+                    ZStack {
+                        VisualEffectBlur(material: .fullScreenUI, blendingMode: .behindWindow)
+                        // Dim the bright wallpaper behind so light text remains
+                        // readable over light desktop backgrounds.
+                        Color.black.opacity(0.35)
+                    }
+                    .ignoresSafeArea()
                 )
                 .background(WindowAccessor { window in
                     // Hidden title bar removes the separator entirely so the
@@ -76,22 +81,32 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             )
 
-            ScrollView(.vertical, showsIndicators: true) {
-                Group {
-                    switch appState.selection {
-                    case 0: FolderTab()
-                    case 1: CheckoutTab()
-                    case 2: AuthTab()
-                    case 3: RecentsTab()
-                    default: AboutTab()
-                    }
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+            // ZStack keeps every tab view alive at all times so their @State
+            // (selected folder, info, etc.) survives switching tabs. The
+            // active one is brought forward; the rest are hidden.
+            ZStack {
+                tabContainer(0) { FolderTab() }
+                tabContainer(1) { CheckoutTab() }
+                tabContainer(2) { AuthTab() }
+                tabContainer(3) { RecentsTab() }
+                tabContainer(4) { AboutTab() }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .foregroundStyle(.white)
+    }
+}
+
+extension ContentView {
+    @ViewBuilder
+    func tabContainer<V: View>(_ index: Int, @ViewBuilder _ view: () -> V) -> some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            view()
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .opacity(appState.selection == index ? 1 : 0)
+        .allowsHitTesting(appState.selection == index)
     }
 }
 
