@@ -67,8 +67,8 @@ struct FolderTab: View {
             }
             .glassCard()
 
-            // Auth selector — glass-styled picker
-            HStack(spacing: 10) {
+            // Auth selector — label sits flush against the picker.
+            HStack(spacing: 8) {
                 Text("SVN Auth:").foregroundStyle(.secondary)
                 Picker("", selection: $selectedAuthID) {
                     Text("None — use svn internal auth").tag(UUID?.none)
@@ -80,9 +80,9 @@ struct FolderTab: View {
                 .pickerStyle(.menu)
                 .buttonStyle(.plain)
                 .focusEffectDisabled()
+                .fixedSize()
                 .glassField()
-                .frame(maxWidth: 360)
-                Spacer()
+                Spacer(minLength: 0)
             }
 
             // Action buttons — uniform fixed-size grid for predictable layout

@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.3.2"
-    static let build       = "11"
+    static let version     = "1.3.3"
+    static let build       = "12"
     static let author      = "AmirhpCom"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!

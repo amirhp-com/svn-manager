@@ -8,8 +8,8 @@ cd "$ROOT"
 APP_NAME="SVN Manager"
 EXEC_NAME="SVNManager"
 BUNDLE_ID="com.amirhp.svnmanager"
-VERSION="1.3.2"
-BUILD_NUMBER="11"
+VERSION="1.3.3"
+BUILD_NUMBER="12"
 
 BUILD_DIR="build"
 APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
@@ -22,6 +22,9 @@ mkdir -p "${BUILD_DIR}"
 
 echo "==> Generating app icon"
 swift tools/make_icon.swift
+
+echo "==> Rounding screenshot (if present)"
+swift tools/round_screenshot.swift
 
 echo "==> Compiling release binary"
 swift build -c release
