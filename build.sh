@@ -23,9 +23,6 @@ mkdir -p "${BUILD_DIR}"
 echo "==> Generating app icon"
 swift tools/make_icon.swift
 
-echo "==> Rounding screenshot (if present)"
-swift tools/round_screenshot.swift
-
 echo "==> Compiling release binary"
 swift build -c release
 

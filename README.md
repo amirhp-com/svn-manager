@@ -9,7 +9,7 @@
 A lightweight, native macOS app for the WordPress.org plugin SVN workflow. Single window, dark mode, Apple liquid-glass vibrancy. Wraps the SVN/Git commands you run every release into one-click buttons with saved auth profiles, a transparent activity log, and a recent-folders list.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="SVN Manager screenshot" width="820">
+  <img src="screenshot.jpeg" alt="SVN Manager screenshot" width="820" style="border-radius: 14px">
 </p>
 
 ## Download
@@ -46,10 +46,9 @@ open "build/SVN Manager.app"
 
 `build.sh` will:
 1. Render the app icon into `build/AppIcon.icns`
-2. Round `docs/screenshot.jpeg` into `docs/screenshot.png` (if present)
-3. Build a release binary
-4. Assemble `build/SVN Manager.app` with a proper `Info.plist`
-5. Package `build/SVN-Manager-1.3.3.dmg` containing the app and an `Applications` symlink for drag-install
+2. Build a release binary
+3. Assemble `build/SVN Manager.app` with a proper `Info.plist`
+4. Package `build/SVN-Manager-1.3.3.dmg` containing the app and an `Applications` symlink for drag-install
 
 ## Auth storage
 
