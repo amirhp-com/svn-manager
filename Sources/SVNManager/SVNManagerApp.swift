@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.3.0"
-    static let build       = "9"
+    static let version     = "1.3.1"
+    static let build       = "10"
     static let author      = "AmirhpCom"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
@@ -107,15 +107,9 @@ struct SidebarFooter: View {
             Button {
                 NSWorkspace.shared.open(AppInfo.repoURL)
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left.forwardslash.chevron.right")
-                        .font(.system(size: 9))
-                    Text("by \(AppInfo.author)")
-                        .font(.system(size: 10.5, weight: .medium))
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 8))
-                }
-                .foregroundStyle(Color.accentColor.opacity(0.95))
+                Text("by \(AppInfo.author)")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Color(red: 0.70, green: 0.85, blue: 1.0))
             }
             .buttonStyle(.plain)
             .focusEffectDisabled()

@@ -38,9 +38,12 @@ struct VisualEffectBlur: NSViewRepresentable {
 }
 
 /// Reusable glass card background.
+/// Always expands to the full available width so cards on the same page line
+/// up regardless of how wide their inner content happens to be.
 struct GlassCard: ViewModifier {
     func body(content: Content) -> some View {
         content
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)

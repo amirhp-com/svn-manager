@@ -38,11 +38,7 @@ struct AuthTab: View {
                         selectedID = nil
                     }
                     pillButton("Delete", systemImage: "trash", danger: true) {
-                        if let id = selectedID {
-                            authStore.profiles.removeAll(where: { $0.id == id })
-                            selectedID = nil
-                            editing = false
-                        }
+                        confirmDelete()
                     }
                     .disabled(selectedID == nil)
                     .opacity(selectedID == nil ? 0.5 : 1)
@@ -150,6 +146,22 @@ struct AuthTab: View {
         }
         selectedID = draft.id
         editing = false
+    }
+
+    private func confirmDelete() {
+        guard let id = selectedID,
+              let p = authStore.profiles.first(where: { $0.id == id }) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete profile “\(p.name)”?"
+        alert.informativeText = "This permanently removes the saved username, password and scope from this app. The remote SVN repository is not affected."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            authStore.profiles.removeAll(where: { $0.id == id })
+            selectedID = nil
+            editing = false
+        }
     }
 
     private func pickScopeFolder() {
