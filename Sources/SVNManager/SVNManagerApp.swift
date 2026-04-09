@@ -1,9 +1,10 @@
 import SwiftUI
+import UserNotifications
 
 enum AppInfo {
     static let name        = "SVN Manager"
-    static let version     = "1.3.3"
-    static let build       = "12"
+    static let version     = "1.3.4"
+    static let build       = "13"
     static let author      = "AmirhpCom"
     static let copyright   = "© 2026- amirhp.com"
     static let websiteURL  = URL(string: "https://amirhp.com/landing")!
@@ -15,6 +16,11 @@ struct SVNManagerApp: App {
     @StateObject private var authStore = AuthStore.shared
     @StateObject private var logStore  = LogStore()
     @StateObject private var appState  = AppState()
+
+    init() {
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
 
     var body: some Scene {
         WindowGroup(AppInfo.name) {

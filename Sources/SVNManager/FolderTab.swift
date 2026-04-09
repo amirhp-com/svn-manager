@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UserNotifications
 
 struct FolderTab: View {
     @EnvironmentObject var authStore: AuthStore
@@ -11,6 +12,8 @@ struct FolderTab: View {
     @State private var isSvn = false
     @State private var isGit = false
     @State private var wpPluginSlug: String? = nil   // set when svn URL is plugins.svn.wordpress.org/<slug>/
+    @State private var pluginTitle: String = ""       // from readme.txt / plugin PHP header
+    @State private var pluginVersion: String = ""     // from Stable tag: or Version:
     @State private var selectedAuthID: UUID? = nil   // nil = use svn internal
     @State private var busy = false
 
@@ -39,6 +42,16 @@ struct FolderTab: View {
                         .foregroundStyle(isSvn ? .green : .secondary)
                     Label(isGit ? "Git" : "no Git", systemImage: isGit ? "checkmark.seal.fill" : "xmark.seal")
                         .foregroundStyle(isGit ? .green : .secondary)
+                    if !pluginTitle.isEmpty {
+                        Text(pluginTitle)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.80))
+                        if !pluginVersion.isEmpty {
+                            Text("v\(pluginVersion)")
+                                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                    }
                     if let slug = wpPluginSlug {
                         Spacer()
                         Button {
@@ -92,13 +105,13 @@ struct FolderTab: View {
                           alignment: .leading, spacing: 10) {
                     actionBtn("Refresh status",
                               systemImage: "arrow.clockwise",
-                              tooltip: "Show local changes vs the working copy.\nRuns: svn stat") { svnStat() }
+                              tooltip: "Show local changes vs the working copy.\nRuns: svn stat") { svnAction(["stat"]) }
                     actionBtn("Pull latest (svn update)",
                               systemImage: "arrow.down.circle",
-                              tooltip: "Download the latest changes from the server into this working copy.\nRuns: svn update") { svn(["update"]) }
+                              tooltip: "Download the latest changes from the server into this working copy.\nRuns: svn update") { svnAction(["update"]) }
                     actionBtn("Stage new files in trunk",
                               systemImage: "plus.circle",
-                              tooltip: "Add any untracked files inside trunk/ so they will be committed next.\nRuns: svn add trunk/* --force") { svn(["add", "trunk/*", "--force"]) }
+                              tooltip: "Add any untracked files inside trunk/ so they will be committed next.\nRuns: svn add trunk/<files> --force") { stageNewFilesInTrunk() }
                     actionBtn("Commit changes…",
                               systemImage: "tray.and.arrow.up",
                               tooltip: "Send all staged changes to the server with a message.\nRuns: svn ci -m \"<your message>\"") { commitPrompt() }
@@ -124,10 +137,10 @@ struct FolderTab: View {
                     if isGit {
                         actionBtn("Git status",
                                   systemImage: "arrow.triangle.branch",
-                                  tooltip: "Show local changes in the Git working tree.\nRuns: git status") { git(["status"]) }
+                                  tooltip: "Show local changes in the Git working tree.\nRuns: git status") { gitAction(["status"]) }
                         actionBtn("Git pull",
                                   systemImage: "arrow.down",
-                                  tooltip: "Pull the latest commits from the Git remote.\nRuns: git pull") { git(["pull"]) }
+                                  tooltip: "Pull the latest commits from the Git remote.\nRuns: git pull") { gitAction(["pull"]) }
                         actionBtn("Git commit & push…",
                                   systemImage: "arrow.up.circle",
                                   tooltip: "Stage all changes, commit them with a message, then push to the remote.\nRuns: git add -A → git commit -m \"<your message>\" → git push") { gitCommitPushPrompt() }
@@ -144,14 +157,20 @@ struct FolderTab: View {
                         .buttonStyle(.borderless)
                         .focusEffectDisabled()
                 }
-                ScrollView {
-                    Text(logStore.text.isEmpty ? "—" : logStore.text)
-                        .font(.system(.caption, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(.vertical, 4)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        Text(logStore.text.isEmpty ? "—" : logStore.text)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .padding(.vertical, 4)
+                        Color.clear.frame(height: 1).id("logBottom")
+                    }
+                    .frame(minHeight: 90, maxHeight: 130)
+                    .onChange(of: logStore.text) { _, _ in
+                        proxy.scrollTo("logBottom")
+                    }
                 }
-                .frame(minHeight: 90, maxHeight: 130)
             }
             .glassCard()
         }
@@ -251,11 +270,15 @@ struct FolderTab: View {
 
     private func inspect() {
         guard Shell.isDirectory(folder) else {
-            info = "Not a directory."; isSvn = false; isGit = false; wpPluginSlug = nil; return
+            info = "Not a directory."; isSvn = false; isGit = false
+            wpPluginSlug = nil; pluginTitle = ""; pluginVersion = ""
+            return
         }
         isSvn = Shell.isDirectory("\(folder)/.svn")
         isGit = Shell.isDirectory("\(folder)/.git")
         wpPluginSlug = nil
+        pluginTitle = ""
+        pluginVersion = ""
         appState.record(folder)
 
         if selectedAuthID == nil {
@@ -269,6 +292,7 @@ struct FolderTab: View {
             let (_, out) = Shell.svn(["info"], cwd: folder, auth: resolvedAuth)
             lines.append(out.trimmingCharacters(in: .whitespacesAndNewlines))
             wpPluginSlug = parseWordPressPluginSlug(from: out)
+            detectPluginInfo()
         }
         if isGit {
             let (_, branch) = Shell.git(["rev-parse", "--abbrev-ref", "HEAD"], cwd: folder)
@@ -278,6 +302,49 @@ struct FolderTab: View {
         }
         if !isSvn && !isGit { lines.append("No SVN or Git repository detected.") }
         info = lines.joined(separator: "\n")
+    }
+
+    /// Parse plugin title and current version from trunk/readme.txt or trunk/*.php
+    private func detectPluginInfo() {
+        let readmePath = "\(folder)/trunk/readme.txt"
+        if let content = try? String(contentsOfFile: readmePath, encoding: .utf8) {
+            for line in content.components(separatedBy: "\n") {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if pluginTitle.isEmpty && t.hasPrefix("===") && t.hasSuffix("===") {
+                    pluginTitle = t.trimmingCharacters(in: CharacterSet(charactersIn: "= "))
+                }
+                if pluginVersion.isEmpty && t.lowercased().hasPrefix("stable tag:") {
+                    pluginVersion = String(t.dropFirst("Stable tag:".count)).trimmingCharacters(in: .whitespaces)
+                }
+                if !pluginTitle.isEmpty && !pluginVersion.isEmpty { break }
+            }
+        }
+
+        // Fallback: scan trunk/*.php for WordPress plugin header
+        if pluginTitle.isEmpty || pluginVersion.isEmpty {
+            let trunkDir = "\(folder)/trunk"
+            if Shell.isDirectory(trunkDir),
+               let phpFiles = try? FileManager.default.contentsOfDirectory(atPath: trunkDir)
+                                   .filter({ $0.hasSuffix(".php") }) {
+                outer: for phpFile in phpFiles {
+                    guard let content = try? String(contentsOfFile: "\(trunkDir)/\(phpFile)", encoding: .utf8) else { continue }
+                    for line in content.components(separatedBy: "\n") {
+                        // Strip leading * or // comment markers
+                        var t = line.trimmingCharacters(in: .whitespaces)
+                        if t.hasPrefix("*") { t = String(t.dropFirst()).trimmingCharacters(in: .whitespaces) }
+                        if t.hasPrefix("//") { t = String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
+                        let lower = t.lowercased()
+                        if pluginTitle.isEmpty && lower.hasPrefix("plugin name:") {
+                            pluginTitle = String(t.dropFirst("Plugin Name:".count)).trimmingCharacters(in: .whitespaces)
+                        }
+                        if pluginVersion.isEmpty && lower.hasPrefix("version:") {
+                            pluginVersion = String(t.dropFirst("Version:".count)).trimmingCharacters(in: .whitespaces)
+                        }
+                        if !pluginTitle.isEmpty && !pluginVersion.isEmpty { break outer }
+                    }
+                }
+            }
+        }
     }
 
     /// Looks for a `URL: https://plugins.svn.wordpress.org/<slug>/...` line in
@@ -296,78 +363,129 @@ struct FolderTab: View {
         return nil
     }
 
-    // MARK: - Logging helpers
+    // MARK: - Streaming helpers
 
     @discardableResult
-    private func runSvnSync(_ args: [String]) -> (Int32, String) {
+    private func runSvnStream(_ args: [String]) -> Int32 {
         logStore.cmd("svn " + args.joined(separator: " "))
-        let (code, out) = Shell.svn(args, cwd: folder, auth: resolvedAuth)
-        logStore.out(out)
+        var hasOutput = false
+        let code = Shell.streamSvn(args, cwd: folder, auth: resolvedAuth) { chunk in
+            hasOutput = true
+            logStore.stream(chunk)
+        }
+        if !hasOutput { logStore.note("(no output)") }
         if code != 0 { logStore.note("(svn exited with \(code))") }
-        return (code, out)
+        return code
     }
 
     @discardableResult
-    private func runGitSync(_ args: [String]) -> (Int32, String) {
+    private func runGitStream(_ args: [String]) -> Int32 {
         logStore.cmd("git " + args.joined(separator: " "))
-        let (code, out) = Shell.git(args, cwd: folder)
-        logStore.out(out)
+        var hasOutput = false
+        let code = Shell.streamGit(args, cwd: folder) { chunk in
+            hasOutput = true
+            logStore.stream(chunk)
+        }
+        if !hasOutput { logStore.note("(no output)") }
         if code != 0 { logStore.note("(git exited with \(code))") }
-        return (code, out)
+        return code
     }
 
-    private func svn(_ args: [String]) {
+    private func svnAction(_ args: [String], notification: String? = nil) {
         busy = true
         DispatchQueue.global().async {
-            _ = runSvnSync(args)
-            DispatchQueue.main.async { busy = false }
+            _ = runSvnStream(args)
+            DispatchQueue.main.async {
+                busy = false
+                notify(notification ?? "svn \(args.first ?? "command") finished")
+            }
         }
     }
 
-    private func git(_ args: [String]) {
+    private func gitAction(_ args: [String], notification: String? = nil) {
         busy = true
         DispatchQueue.global().async {
-            _ = runGitSync(args)
-            DispatchQueue.main.async { busy = false }
+            _ = runGitStream(args)
+            DispatchQueue.main.async {
+                busy = false
+                notify(notification ?? "git \(args.first ?? "command") finished")
+            }
         }
     }
 
-    private func svnStat() { svn(["stat"]) }
+    // MARK: - Notifications
+
+    private func notify(_ body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "SVN Manager"
+        content.body = body
+        content.sound = .default
+        let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req) { _ in }
+    }
+
+    // MARK: - SVN actions
+
+    private func stageNewFilesInTrunk() {
+        let trunkDir = "\(folder)/trunk"
+        guard Shell.isDirectory(trunkDir) else {
+            logStore.note("No trunk/ directory found in \(folder).")
+            return
+        }
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: trunkDir)) ?? []
+        guard !items.isEmpty else {
+            logStore.note("trunk/ is empty — nothing to stage.")
+            return
+        }
+        // Pass explicit paths so there is no shell glob involved
+        let paths = items.map { "trunk/\($0)" }
+        svnAction(["add", "--force"] + paths, notification: "Staged new files in trunk")
+    }
 
     private func commitPrompt() {
-        if let msg = prompt(title: "Commit", message: "Commit message:") {
-            svn(["ci", "-m", msg])
+        let suggestion = pluginVersion.isEmpty ? "" : "staging version \(pluginVersion)"
+        if let msg = prompt(title: "Commit", message: "Commit message:", defaultValue: suggestion), !msg.isEmpty {
+            svnAction(["ci", "-m", msg], notification: "Commit finished")
         }
     }
 
     private func tagPrompt() {
-        guard let v = prompt(title: "Tag version", message: "Version (e.g. 1.4.2):"), !v.isEmpty else { return }
+        guard let v = prompt(title: "Tag version", message: "Version (e.g. 1.4.2):", defaultValue: pluginVersion),
+              !v.isEmpty else { return }
         busy = true
         DispatchQueue.global().async {
-            runSvnSync(["cp", "trunk", "tags/\(v)"])
-            runSvnSync(["ci", "-m", "tagging version \(v)"])
-            DispatchQueue.main.async { busy = false }
+            runSvnStream(["cp", "trunk", "tags/\(v)"])
+            runSvnStream(["ci", "-m", "tagging version \(v)"])
+            DispatchQueue.main.async {
+                busy = false
+                notify("Tagged version \(v)")
+            }
         }
     }
 
     private func deleteTagPrompt() {
         guard let v = prompt(title: "Delete remote tag", message: "Tag to remove:"), !v.isEmpty else { return }
-        svn(["delete", "^/tags/\(v)", "-m", "Remove incorrect tag \(v)."])
+        svnAction(["delete", "^/tags/\(v)", "-m", "Remove incorrect tag \(v)."],
+                  notification: "Removed tag \(v)")
     }
 
-    /// Stage everything inside assets/ (whatever is on disk right now) and commit.
-    /// No file picker — copy files into assets/ yourself in Finder first, then click.
     private func commitAssets() {
         let assetsDir = "\(folder)/assets"
         guard Shell.isDirectory(assetsDir) else {
             logStore.note("# commit assets"); logStore.note("No assets/ directory found."); return
         }
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: assetsDir)) ?? []
+        let paths = items.map { "assets/\($0)" }
         busy = true
         DispatchQueue.global().async {
             logStore.note("# commit assets")
-            runSvnSync(["add", "assets/*", "--force"])
-            runSvnSync(["commit", "-m", "update assets"])
-            DispatchQueue.main.async { busy = false }
+            if paths.isEmpty {
+                logStore.note("assets/ is empty.")
+            } else {
+                runSvnStream(["add", "--force"] + paths)
+                runSvnStream(["commit", "-m", "update assets"])
+            }
+            DispatchQueue.main.async { busy = false; notify("Assets committed") }
         }
     }
 
@@ -379,15 +497,16 @@ struct FolderTab: View {
         busy = true
         DispatchQueue.global().async {
             logStore.note("# fix asset MIME types in assets/")
-            for (ext, mime) in [("png","image/png"),("jpg","image/jpeg"),("jpeg","image/jpeg"),("gif","image/gif"),("svg","image/svg+xml")] {
+            for (ext, mime) in [("png","image/png"),("jpg","image/jpeg"),("jpeg","image/jpeg"),
+                                 ("gif","image/gif"),("svg","image/svg+xml")] {
                 let files = (try? FileManager.default.contentsOfDirectory(atPath: assets)
                     .filter { $0.lowercased().hasSuffix("." + ext) }) ?? []
                 if files.isEmpty { continue }
                 let args = ["propset", "svn:mime-type", mime] + files.map { "assets/\($0)" }
-                runSvnSync(args)
+                runSvnStream(args)
             }
-            runSvnSync(["commit", "-m", "fixed attachments"])
-            DispatchQueue.main.async { busy = false }
+            runSvnStream(["commit", "-m", "fixed attachments"])
+            DispatchQueue.main.async { busy = false; notify("Asset MIME types fixed and committed") }
         }
     }
 
@@ -395,16 +514,17 @@ struct FolderTab: View {
         busy = true
         DispatchQueue.global().async {
             logStore.note("# remove files deleted locally from SVN")
-            let (_, stat) = runSvnSync(["stat"])
+            let (_, stat) = Shell.svn(["stat"], cwd: folder, auth: resolvedAuth)
+            logStore.cmd("svn stat"); logStore.stream(stat)
             let missing = stat.split(separator: "\n").compactMap { line -> String? in
                 let s = String(line)
                 guard s.hasPrefix("!") else { return nil }
                 return s.dropFirst().trimmingCharacters(in: .whitespaces)
             }
             logStore.note("missing files: \(missing.count)")
-            for f in missing { runSvnSync(["rm", "--force", f]) }
-            if !missing.isEmpty { runSvnSync(["commit", "-m", "Remove extra files"]) }
-            DispatchQueue.main.async { busy = false }
+            for f in missing { runSvnStream(["rm", "--force", f]) }
+            if !missing.isEmpty { runSvnStream(["commit", "-m", "Remove extra files"]) }
+            DispatchQueue.main.async { busy = false; notify("Removed \(missing.count) deleted file(s) from SVN") }
         }
     }
 
@@ -414,13 +534,13 @@ struct FolderTab: View {
         busy = true
         DispatchQueue.global().async {
             logStore.note("# git commit & push")
-            runGitSync(["add", "-A"])
-            let (commitCode, _) = runGitSync(["commit", "-m", msg])
+            runGitStream(["add", "-A"])
+            let commitCode = runGitStream(["commit", "-m", msg])
             if commitCode != 0 {
                 logStore.note("(commit step did not produce a new commit — pushing anyway)")
             }
-            runGitSync(["push"])
-            DispatchQueue.main.async { busy = false }
+            runGitStream(["push"])
+            DispatchQueue.main.async { busy = false; notify("Git commit & push finished") }
         }
     }
 
@@ -428,14 +548,16 @@ struct FolderTab: View {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder)])
     }
 
-    private func prompt(title: String, message: String) -> String? {
+    private func prompt(title: String, message: String, defaultValue: String = "") -> String? {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
         let tf = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        tf.stringValue = defaultValue
         alert.accessoryView = tf
+        tf.selectText(nil)   // pre-select so user can type immediately
         let r = alert.runModal()
         return r == .alertFirstButtonReturn ? tf.stringValue : nil
     }

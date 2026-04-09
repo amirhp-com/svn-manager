@@ -31,22 +31,77 @@ enum Shell {
         return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
     }
 
+    /// Run a command and stream output chunks to `onOutput` as they arrive.
+    /// Returns the exit code once the process finishes.
+    @discardableResult
+    static func stream(_ launchPath: String, _ args: [String], cwd: String? = nil,
+                       onOutput: @escaping (String) -> Void) -> Int32 {
+        let p = Process()
+        p.launchPath = "/usr/bin/env"
+        p.arguments = [launchPath] + args
+        if let cwd { p.currentDirectoryURL = URL(fileURLWithPath: cwd) }
+
+        var env = ProcessInfo.processInfo.environment
+        let inherited = env["PATH"] ?? ""
+        env["PATH"] = inherited.isEmpty ? extendedPath : "\(extendedPath):\(inherited)"
+        if env["HOME"] == nil { env["HOME"] = NSHomeDirectory() }
+        p.environment = env
+
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe
+
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if !data.isEmpty, let s = String(data: data, encoding: .utf8) {
+                onOutput(s)
+            }
+        }
+
+        do { try p.run() } catch {
+            onOutput("Failed to launch \(launchPath): \(error.localizedDescription)\n")
+            return -1
+        }
+        p.waitUntilExit()
+        pipe.fileHandleForReading.readabilityHandler = nil
+        // Drain any data that arrived after the last handler firing
+        let rem = pipe.fileHandleForReading.readDataToEndOfFile()
+        if !rem.isEmpty, let s = String(data: rem, encoding: .utf8) { onOutput(s) }
+        return p.terminationStatus
+    }
+
     static func svn(_ args: [String], cwd: String? = nil, auth: AuthProfile? = nil) -> (Int32, String) {
         var full = args
         if let a = auth {
-            full.insert(contentsOf: [
-                "--username", a.username,
-                "--password", a.password,
-                "--non-interactive",
-                "--no-auth-cache",
-                "--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other"
-            ], at: 0)
+            full.insert(contentsOf: authFlags(a), at: 0)
         }
         return run("svn", full, cwd: cwd)
     }
 
+    static func streamSvn(_ args: [String], cwd: String? = nil, auth: AuthProfile? = nil,
+                          onOutput: @escaping (String) -> Void) -> Int32 {
+        var full = args
+        if let a = auth {
+            full.insert(contentsOf: authFlags(a), at: 0)
+        }
+        return stream("svn", full, cwd: cwd, onOutput: onOutput)
+    }
+
     static func git(_ args: [String], cwd: String? = nil) -> (Int32, String) {
         return run("git", args, cwd: cwd)
+    }
+
+    static func streamGit(_ args: [String], cwd: String? = nil,
+                          onOutput: @escaping (String) -> Void) -> Int32 {
+        return stream("git", args, cwd: cwd, onOutput: onOutput)
+    }
+
+    private static func authFlags(_ a: AuthProfile) -> [String] {
+        ["--username", a.username,
+         "--password", a.password,
+         "--non-interactive",
+         "--no-auth-cache",
+         "--trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid,other"]
     }
 
     static func isDirectory(_ path: String) -> Bool {

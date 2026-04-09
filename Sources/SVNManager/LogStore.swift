@@ -13,6 +13,11 @@ final class LogStore: ObservableObject {
     func note(_ n: String) { append(n + "\n") }
     func clear()           { DispatchQueue.main.async { self.text = "" } }
 
+    /// Append a raw chunk (used for real-time streaming from a running process).
+    func stream(_ chunk: String) {
+        DispatchQueue.main.async { self.text += chunk }
+    }
+
     private func append(_ s: String) {
         DispatchQueue.main.async { self.text += s }
     }
